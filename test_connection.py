@@ -27,14 +27,12 @@ CONTAINERS = [
 
 
 def test_connection():
-    """Verify we can create a BlobServiceClient."""
     print("1. Testing connection...")
     client = get_service_client()
     print(f"   Connected to: {client.account_name}\n")
 
 
 def test_list_containers():
-    """List all containers the account can see."""
     print("2. Listing containers...")
     client = get_service_client()
     containers = [c.name for c in client.list_containers()]
@@ -42,7 +40,6 @@ def test_list_containers():
 
 
 def test_list_blobs():
-    """List first 5 blobs in each expected container."""
     print("3. Listing blobs per container...")
     for name in CONTAINERS:
         try:
@@ -60,7 +57,6 @@ def test_list_blobs():
 
 
 def test_download_sample():
-    """Download road-closure blobs from a small 24-hour window."""
     print("4. Test download (road closures, 24h window)...")
     start = datetime(2026, 4, 10, 0, 0, 0, tzinfo=timezone.utc)
     end   = datetime(2026, 4, 10, 23, 59, 59, tzinfo=timezone.utc)

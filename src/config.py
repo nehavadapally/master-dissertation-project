@@ -1,28 +1,13 @@
 """Centralised configuration — loads credentials from .env file."""
 
 import os
-
-try:
-    from dotenv import load_dotenv
-except ImportError as exc:
-    raise ImportError(
-        "Missing dependency: python-dotenv. Install it with `pip install -r requirements.txt`."
-    ) from exc
+from dotenv import load_dotenv
 
 load_dotenv()
 
-# Azure Blob Storage
-AZURE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-if AZURE_CONNECTION_STRING:
-    AZURE_CONNECTION_STRING = AZURE_CONNECTION_STRING.strip().strip('"').strip("'")
+AZURE_CONNECTION_STRING = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
 
-if not AZURE_CONNECTION_STRING:
-    raise RuntimeError(
-        "AZURE_STORAGE_CONNECTION_STRING is not set. Copy `.env.example` to `.env` and add your Azure connection string, "
-        "or set the environment variable before running the script."
-    )
-
-# Container names
+# Azure container names
 CONTAINER_ROAD_CLOSURES = "road-closures"
 CONTAINER_TRAIN_MOMENTS = "train-moments"
 CONTAINER_DARWIN_REALTIME = "darwin-realtime-feeds"

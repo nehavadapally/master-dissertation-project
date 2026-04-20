@@ -1,7 +1,10 @@
-"""Azure Blob Storage client and helpers."""
+"""Azure Blob Storage client with local file caching."""
 
 import os
+
+import pandas as pd
 from azure.storage.blob import BlobServiceClient
+
 from src.config import AZURE_CONNECTION_STRING
 
 
@@ -12,9 +15,9 @@ def get_service_client():
 
 def download_blobs_in_window(container_name, local_dir, start_utc, end_utc):
     """Download all blobs modified within [start_utc, end_utc] to local_dir."""
-    client = get_service_client()
-    container = client.get_container_client(container_name)
+    container = get_service_client().get_container_client(container_name)
     os.makedirs(local_dir, exist_ok=True)
+    print(f"Connected to container: {container_name}")
 
     count = 0
     for blob in container.list_blobs():
@@ -27,14 +30,13 @@ def download_blobs_in_window(container_name, local_dir, start_utc, end_utc):
                 f.write(blob_client.download_blob().readall())
             count += 1
 
-    print(f"Downloaded {count} blob(s) from '{container_name}' to '{local_dir}'")
+    print(f"Downloaded {count} blob(s) to '{local_dir}'")
     return count
 
 
 def download_blob_by_name(container_name, blob_name, local_dir):
     """Download a single blob by exact name."""
-    client = get_service_client()
-    container = client.get_container_client(container_name)
+    container = get_service_client().get_container_client(container_name)
     os.makedirs(local_dir, exist_ok=True)
 
     blob_client = container.get_blob_client(blob_name)
@@ -44,12 +46,28 @@ def download_blob_by_name(container_name, blob_name, local_dir):
     with open(path, "wb") as f:
         f.write(blob_client.download_blob().readall())
 
-    print(f"Downloaded '{blob_name}' → '{path}'")
     return path
+
+
+def get_local_files_in_window(dir_path, start_utc, end_utc):
+    """Return local file paths whose last-modified time falls within the UTC window."""
+    if not os.path.isdir(dir_path):
+        return []
+
+    matching = []
+    for fname in os.listdir(dir_path):
+        fpath = os.path.join(dir_path, fname)
+        if not os.path.isfile(fpath):
+            continue
+
+        mtime = pd.to_datetime(os.path.getmtime(fpath), unit="s", utc=True)
+        if start_utc <= mtime <= end_utc:
+            matching.append(fpath)
+
+    return matching
 
 
 def list_blobs(container_name):
     """List all blob names in a container."""
-    client = get_service_client()
-    container = client.get_container_client(container_name)
+    container = get_service_client().get_container_client(container_name)
     return [blob.name for blob in container.list_blobs()]

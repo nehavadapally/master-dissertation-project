@@ -1,32 +1,59 @@
-## Setup
+# Rail Delay Prediction
 
-```bash
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env with your Azure Storage connection string
-```
+Predicts rail service delays caused by nearby road closures using UK rail and road data from Azure Blob Storage.
 
 ## Project structure
 
 ```
-src/
-├── config.py          # Loads .env, defines container names and local paths
-└── azure_client.py    # Azure Blob Storage client (download by time window or name)
+rail-delay-prediction/
+├── .env.example              # Credential template (copy to .env)
+├── .gitignore
+├── requirements.txt
+├── README.md
+├── test_connection.py        # Azure connection smoke test
+├── src/
+│   ├── __init__.py
+│   ├── config.py             # Loads .env, defines container names & paths
+│   ├── azure_client.py       # Azure Blob Storage ops + local file caching
+│   ├── parsers.py            # CSV/JSON loader + Darwin timetable parser
+│   ├── data_loader.py        # Downloads & loads all data sources
+│   ├── geo.py                # Haversine distance & closure-to-station matching
+│   └── features.py           # Timetable reshaping, merge/filter, delay calc
+└── notebooks/
+    └── rail_delay_prediction.ipynb   # EDA + modelling (the main analysis)
 ```
 
-## Usage
+## Setup
 
-```python
-from datetime import datetime, timezone
-from src.azure_client import download_blobs_in_window, list_blobs
-from src.config import CONTAINER_ROAD_CLOSURES, ROAD_DIR
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
 
-# List blobs in a container
-blobs = list_blobs(CONTAINER_ROAD_CLOSURES)
+# 2. Configure credentials
+cp .env.example .env
+# Edit .env with your Azure Storage connection string
 
-# Download blobs within a time window
-start = datetime(2026, 4, 10, 0, 0, 0, tzinfo=timezone.utc)
-end   = datetime(2026, 4, 12, 23, 59, 59, tzinfo=timezone.utc)
+# 3. Verify connection
+python test_connection.py
 
-download_blobs_in_window(CONTAINER_ROAD_CLOSURES, ROAD_DIR, start, end)
+# 4. Run the analysis
+cd notebooks
+jupyter notebook rail_delay_prediction.ipynb
 ```
+
+## Data sources
+
+| Source | Azure container | Description |
+|--------|----------------|-------------|
+| Road closures | `road-closures` | Planned & unplanned road closure events |
+| Train moments | `train-moments` | Real-time train movement records |
+| Darwin timetable | `darwin-timetable-feeds` | Scheduled timetable (XML) |
+| Station reference | `rail-road-data` | GB stations CSV + CORPUS TIPLOC lookup |
+
+## Approach
+
+1. **Geospatial matching** — each road closure is matched to rail stations within 10–25 km (haversine)
+2. **Temporal filtering** — only train services within 60 minutes of a closure start are kept
+3. **Feature engineering** — distance, time-since-closure, event type, interaction terms
+4. **Modelling** — Linear Regression, Random Forest, Gradient Boosting, XGBoost
+5. **Prediction** — best model predicts delays for future timetabled services near active closures
