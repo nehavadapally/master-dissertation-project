@@ -1,6 +1,7 @@
 """Azure Blob Storage client with local file caching."""
 
 import os
+from string import digits
 
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
@@ -35,22 +36,31 @@ def download_blobs_in_window(container_name, local_dir, start_utc, end_utc):
 
 
 def download_blob_by_name(container_name, blob_name, local_dir):
-    """Download a single blob by exact name."""
+    """
+    Accepts a list of blob names.
+    Checks local_dir for existing files.
+    Downloads only missing blobs from Azure.
+    Returns list of local file paths.
+    """
     container = get_service_client().get_container_client(container_name)
     os.makedirs(local_dir, exist_ok=True)
 
-    blob_client = container.get_blob_client(blob_name)
     safe_name = blob_name.replace("/", "_")
-    path = os.path.join(local_dir, safe_name)
+    local_path = os.path.join(local_dir, safe_name)
 
-    with open(path, "wb") as f:
-        f.write(blob_client.download_blob().readall())
+    # If file already exists locally → skip download
+    if not os.path.exists(local_path):
+        blob_client = container.get_blob_client(blob_name)
+        with open(local_path, "wb") as f:
+            f.write(blob_client.download_blob().readall())
 
-    return path
-
+    
+    print(local_path)
+    return local_path
 
 def get_local_files_in_window(dir_path, start_utc, end_utc):
-    """Return local file paths whose last-modified time falls within the UTC window."""
+    """Return local file paths whose filename datetime falls within the UTC window."""
+
     if not os.path.isdir(dir_path):
         return []
 
@@ -60,12 +70,45 @@ def get_local_files_in_window(dir_path, start_utc, end_utc):
         if not os.path.isfile(fpath):
             continue
 
-        mtime = pd.to_datetime(os.path.getmtime(fpath), unit="s", utc=True)
-        if start_utc <= mtime <= end_utc:
+        file_dt = None
+
+        # ---------------------------------------------------
+        # CASE 1: Darwin Timetable files
+        # ---------------------------------------------------
+        if "data\darwin_timetable" in dir_path.lower():
+            try:
+                base = os.path.splitext(fname)[0]
+                digits = "".join(c for c in base if c.isdigit())[:14]
+                file_dt = pd.to_datetime(digits, format="%Y%m%d%H%M%S", utc=True)
+
+            except Exception as e:
+                print(f"Could not parse timetable filename: {fname}")
+                print(f"Error: {e}")
+                continue
+
+        # ---------------------------------------------------
+        # CASE 2: Train/Road/Rail data files
+        # ---------------------------------------------------
+        else:
+            try:
+                base = os.path.splitext(fname)[0]
+                parts = base.split("_")
+                date_str = parts[-2]
+                time_str = parts[-1]
+                file_dt = pd.to_datetime(date_str + time_str,
+                                         format="%Y%m%d%H%M%S",
+                                         utc=True)
+
+            except Exception:
+                print(f"Could not parse filename: {fname}")
+                continue
+
+        # ---------------------------------------------------
+        # Check if file datetime is inside the window
+        # ---------------------------------------------------
+        if start_utc <= file_dt <= end_utc:
             matching.append(fpath)
-
     return matching
-
 
 def list_blobs(container_name):
     """List all blob names in a container."""

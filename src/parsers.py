@@ -8,8 +8,14 @@ import pandas as pd
 def load_file(path):
     """Load a CSV or newline-delimited JSON file into a DataFrame."""
     if path.endswith(".csv"):
-        return pd.read_csv(path)
-    return pd.read_json(path, lines=True)
+        try:
+            return pd.read_csv(path)
+        except pd.errors.EmptyDataError:
+            print(f"Skipping empty CSV file: {path}")
+            return pd.DataFrame()   # return empty df
+    else:
+        return pd.read_json(path, lines=True)
+
 
 
 def parse_darwin_timetable_files(timetable_files):

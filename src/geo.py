@@ -16,27 +16,27 @@ def haversine_vectorised(lat1, lon1, lat2_array, lon2_array):
     return 6371 * 2 * np.arcsin(np.sqrt(a))
 
 
-def find_nearby_stations(road_df, stations_df, stations_lookup_df,
-                         min_km=10, max_km=25):
+def find_nearby_stations(road_df, stations_df, min_km=10, max_km=25):
     """Expand road closures by matching each to stations within a distance band.
 
     Args:
         road_df: road closure DataFrame (needs closure_lat, closure_lon,
                  start_time, end_time, closure_type, validity_status, situation_id,
                  ingested_at columns).
-        stations_df: station DataFrame (needs Station, TLC, Latitude, Longitude).
-        stations_lookup_df: TIPLOC lookup with '3alpha', 'stanox', 'tiploc' columns.
+        stations_df: station DataFrame (needs Station, TLC, latitude, longitude).
         min_km: minimum distance from closure (default 10).
         max_km: maximum distance from closure (default 25).
 
     Returns:
         DataFrame with one row per (closure, nearby station) pair.
     """
-    station_lat = stations_df["Latitude"].values
-    station_lon = stations_df["Longitude"].values
+    station_lat = stations_df["latitude"].values
+    station_lon = stations_df["longitude"].values
 
-    tlc_to_stanox = stations_lookup_df.set_index("3alpha")["stanox"].to_dict()
-    tlc_to_tiploc = stations_lookup_df.set_index("3alpha")["tiploc"].to_dict()
+
+
+    tlc_to_stanox = stations_df.set_index("tlc")["stanox"].to_dict()
+    tlc_to_tiploc = stations_df.set_index("tlc")["tiploc"].to_dict()
 
     rows = []
     for _, row in road_df.iterrows():
@@ -48,7 +48,8 @@ def find_nearby_stations(road_df, stations_df, stations_lookup_df,
         nearby["distance_km"] = distances[mask]
 
         for _, st in nearby.iterrows():
-            tlc = st["TLC"]
+            
+            tlc = st["tlc"]
             rows.append({
                 "closure_id": row.get("situation_id"),
                 "closure_lat": lat,
@@ -56,10 +57,14 @@ def find_nearby_stations(road_df, stations_df, stations_lookup_df,
                 "closure_type": row["closure_type"],
                 "closure_start_time": pd.to_datetime(row["start_time"]).tz_localize(None),
                 "closure_end_time": pd.to_datetime(row["end_time"]).tz_localize(None),
+                "start_hour": row["start_hour"],
+                "start_dow": row["start_dow"],
+                "start_date": row["start_date"],
                 "validity_status": row["validity_status"],
-                "station_name": st["Station"],
-                "station_lat": st["Latitude"],
-                "station_lon": st["Longitude"],
+                "cause_type": row["cause_type"],
+                "station_name": st["station"],
+                "station_lat": st["latitude"],
+                "station_lon": st["longitude"],
                 "station_code": tlc,
                 "stanox": tlc_to_stanox.get(tlc),
                 "tpl": tlc_to_tiploc.get(tlc),

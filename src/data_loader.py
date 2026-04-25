@@ -4,11 +4,13 @@ Each public function checks for local files first, downloads from Azure
 only if needed, and returns a clean DataFrame.
 """
 
+from importlib.resources import path
 import io
 import json
 import os
 import xml.etree.ElementTree as ET
 
+from numpy import dtype
 import pandas as pd
 
 from src.azure_client import (
@@ -62,35 +64,34 @@ def load_road_closures(start_utc, end_utc):
 # ---------------------------------------------------------------------------
 
 def load_stations():
-    """Load the GB stations CSV from the local rail directory."""
-    
-    path = download_blob_by_name(CONTAINER_RAIL_ROAD_DATA, "gb_stations.csv", RAIL_DIR)
-    return pd.read_csv(path)
+    """Load GB stations CSV and corpus extract JSON, merge on TLC."""
+
+    # Download or load cached files
+    file_path = download_blob_by_name(
+        CONTAINER_RAIL_ROAD_DATA,
+        "gb_stations.csv",
+        RAIL_DIR
+    )
+    return pd.read_csv(file_path)
+
+
 
 
 def load_stations_lookup():
     """Download the CORPUS extract and return a normalised TIPLOC lookup DataFrame."""
-    client = get_service_client()
-    container = client.get_container_client(CONTAINER_RAIL_ROAD_DATA)
+    # Download or load cached files
+    file_path = download_blob_by_name(
+        CONTAINER_RAIL_ROAD_DATA,
+        "corpusextract.json",
+        RAIL_DIR
+    )
 
-    for blob in container.list_blobs():
-        if blob.name.lower() == "corpusextract.json":
-            os.makedirs(RAIL_DIR, exist_ok=True)
-            blob_client = container.get_blob_client(blob.name)
-            path = os.path.join(RAIL_DIR, blob.name.replace("/", "_"))
-
-            with open(path, "wb") as f:
-                f.write(blob_client.download_blob().readall())
-            break
-
-    path = os.path.join(RAIL_DIR, "corpusextract.json")
-    raw = pd.read_json(path)
+    raw = pd.read_json(file_path)
 
     def _parse(x):
         return json.loads(x) if isinstance(x, str) else x
 
     lookup = pd.json_normalize(raw["TIPLOCDATA"].apply(_parse))
-    lookup.columns = lookup.columns.str.lower()
     return lookup
 
 
@@ -112,33 +113,36 @@ def load_train_moment_files(start_utc, end_utc):
     return [os.path.join(TRAIN_DIR, f) for f in os.listdir(TRAIN_DIR)]
 
 
-def parse_train_moments(train_files, stations_lookup_df):
+def parse_train_moments(train_files, stations_df):
     """Parse train-moment files into a DataFrame with timestamps and station codes.
 
     Args:
         train_files: list of file paths from load_train_moment_files().
-        stations_lookup_df: TIPLOC lookup from load_stations_lookup().
+        stations_df: DataFrame of stations from load_stations().
 
     Returns:
         DataFrame with parsed timestamps and mapped station_code column.
     """
     frames = []
     for fpath in train_files:
-        df = load_file(fpath)
-        df.columns = df.columns.str.strip().str.lower()
+        df = load_file(fpath) 
+        if len(df) > 0:
+            df.columns = df.columns.str.strip().str.lower()
 
-        for col in ("actual_timestamp", "planned_timestamp", "gbtt_timestamp"):
-            if col in df.columns:
-                df[col] = df[col].apply(
-                    lambda x: pd.to_datetime(int(x), unit="ms") if pd.notna(x) else None
-                )
-
-        frames.append(df)
+            for col in ("actual_timestamp", "planned_timestamp", "gbtt_timestamp"):
+                if col in df.columns:
+                    df[col] = df[col].apply(
+                        lambda x: pd.to_datetime(int(x), unit="ms") if pd.notna(x) else None
+                    )
+    
+            frames.append(df)
+        else:
+            continue
 
     result = pd.concat(frames, ignore_index=True)
 
     # Map STANOX → 3ALPHA station code
-    station_map = dict(zip(stations_lookup_df["stanox"], stations_lookup_df["3alpha"]))
+    station_map = dict(zip(stations_df["stanox"], stations_df["tlc"]))
     result["station_code"] = (
         result["loc_stanox"]
         .apply(lambda x: str(int(x)).zfill(5) if pd.notna(x) else None)
@@ -167,31 +171,75 @@ def _element_to_dict(elem):
     }
 
 
-def load_darwin_timetable():
-    """Stream-parse Darwin timetable XMLs from Azure → JSON on disk → DataFrame."""
+def load_darwin_timetable(start_utc, end_utc):
+    """
+    Load Darwin timetable files:
+    1. Check local directory first (filter by filename datetime)
+    2. Download missing files from Azure (only those in the window)
+    3. Parse timetable JSON files into a DataFrame
+    """
+
+    os.makedirs(DARWIN_TIMETABLE_DIR, exist_ok=True)
+
+    # ---------------------------------------------------------
+    # STEP 1 - Get local files in the time window
+    # ---------------------------------------------------------
+    local_files = get_local_files_in_window(DARWIN_TIMETABLE_DIR, start_utc, end_utc)
+
+    # If we already have all files locally, skip Azure
+    if local_files:
+        return parse_darwin_timetable_files(local_files)
+
+    # ---------------------------------------------------------
+    # STEP 2 - Otherwise fetch from Azure
+    # ---------------------------------------------------------
     client = get_service_client()
     container = client.get_container_client(CONTAINER_DARWIN_TIMETABLE)
-    os.makedirs(DARWIN_TIMETABLE_DIR, exist_ok=True)
     print(f"Connected to container: {container.container_name}")
+
+    downloaded_files = []
 
     for blob in container.list_blobs():
         if not blob.name.lower().endswith(".xml"):
             continue
 
-        print(f"Processing: {blob.name}")
+        # Extract datetime from filename
+        try:
+            base = os.path.splitext(os.path.basename(blob.name))[0]
+            digits = "".join(c for c in base if c.isdigit())
+            file_dt = pd.to_datetime(digits, format="%Y%m%d%H%M%S", utc=True)
+        except Exception:
+            print(f"Could not parse timetable filename: {blob.name}")
+            continue
+
+        # Check if blob is inside the requested window
+        if not (start_utc <= file_dt <= end_utc):
+            continue
+
+        print(f"Downloading + parsing: {blob.name}")
+
+        # Download XML
         stream = container.get_blob_client(blob.name).download_blob()
         file_like = io.BytesIO(stream.readall())
 
+        # Parse XML → JSON
         journeys = []
         for _, elem in ET.iterparse(file_like, events=("end",)):
             if _strip_ns(elem.tag) == "Journey":
                 journeys.append(_element_to_dict(elem))
                 elem.clear()
 
+        # Save JSON locally
         out_name = os.path.basename(blob.name).replace(".xml", ".json")
         out_path = os.path.join(DARWIN_TIMETABLE_DIR, out_name)
+
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(journeys, f, indent=2)
 
-    files = [os.path.join(DARWIN_TIMETABLE_DIR, f) for f in os.listdir(DARWIN_TIMETABLE_DIR)]
-    return parse_darwin_timetable_files(files)
+        downloaded_files.append(out_path)
+
+    # ---------------------------------------------------------
+    # STEP 3 - Parse all timetable JSON files
+    # ---------------------------------------------------------
+    return parse_darwin_timetable_files(downloaded_files)
+

@@ -1,6 +1,7 @@
 """Feature engineering — timetable reshaping, temporal filtering, delay calculation."""
 
 import pandas as pd
+import numpy as np
 
 
 # ---------------------------------------------------------------------------
@@ -8,53 +9,81 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 EVENT_MAP = {"wta": "ARRIVAL", "wtd": "DEPARTURE", "wtp": "PASS"}
-TIME_COLS = ["wta", "wtd", "wtp"]
 
-
-def reshape_timetable_to_schedule(timetable_df, stations_lookup_df):
-    """Convert wide timetable (wta/wtd/wtp) into long schedule rows.
-
-    Adds station_code and stanox via TIPLOC lookup, melts time columns
-    into individual event rows, and builds full planned_timestamp.
-
-    Returns:
-        DataFrame with columns: stanox, tpl, station_code, timetable_train_id,
-        planned_timestamp, event_type.
-    """
-    tpl_lookup = (
-        stations_lookup_df[["tiploc", "3alpha", "stanox"]]
-        .drop_duplicates(subset="tiploc")
-        .rename(columns={"3alpha": "station_code"})
-    )
-    tpl_to_code = tpl_lookup.set_index("tiploc")["station_code"]
-    tpl_to_stanox = tpl_lookup.set_index("tiploc")["stanox"]
+def reshape_timetable_to_schedule(timetable_df, stations_df):
 
     df = timetable_df.copy()
-    df["station_code"] = df["tpl"].map(tpl_to_code)
-    df["stanox"] = df["tpl"].map(tpl_to_stanox)
+    def clean_act(x):
+        if isinstance(x, str):
+            x = x.strip()
+            if x.lower() in ("nan", "none", "null", ""):
+                return ""
+            return x
+        return ""   # for floats, NaN, None, objects
+
+    # Lookup maps
+    tpl_lookup = (
+        stations_df[["tiploc", "tlc", "stanox"]]
+        .drop_duplicates(subset="tiploc")
+        .rename(columns={"tlc": "station_code"})
+    )
+
+    df["station_code"] = df["tpl"].map(tpl_lookup.set_index("tiploc")["station_code"])
+    df["stanox"] = df["tpl"].map(tpl_lookup.set_index("tiploc")["stanox"])
     df["timetable_train_id"] = df["trainId"]
-
     keep_cols = ["ssd", "tpl", "station_code", "stanox", "timetable_train_id"]
+    df["act"] = df["act"].apply(clean_act)
 
-    # Melt wta/wtd/wtp into long format
-    df = df.melt(
-        id_vars=keep_cols,
-        value_vars=[c for c in TIME_COLS if c in df.columns],
-        var_name="event_col",
-        value_name="time_str",
+    # print(df["act"].dtype)
+    def choose_time(row):
+        act = row["act"]
+
+        try:
+            match True:
+            
+                case _ if "TF" in act:
+                    primary = row["wta"]
+                case _ if "TB" in act:
+                    primary = row["wtd"]
+                case _ if ("T" not in act and "D" not in act and "U" not in act and row["wtp"]):
+                    primary = row["wtp"]
+                case _ if ("T" in act or "D" in act or "U" in act):
+                    primary = row["wta"]
+                case _:
+                    primary = row["wtd"]
+                
+        except Exception as e:
+            print(row, e)
+
+        # fallback chain
+        return primary or row["wta"] or row["wtd"] or row["wtp"]
+
+    df["chosen_time"] = df.apply(choose_time, axis=1)
+
+    # Normalise
+    df["chosen_time"] = df["chosen_time"].astype(str).str.strip()
+    df["chosen_time"] = np.where(
+        df["chosen_time"].str.len() == 5,
+        df["chosen_time"] + ":00",
+        df["chosen_time"]
     )
-    df = df.dropna(subset=["time_str"])
 
-    # Normalise HH:MM → HH:MM:00
-    df["time_str"] = df["time_str"].apply(
-        lambda x: f"{x}:00" if len(str(x)) == 5 else str(x)
-    )
-
-    # Build full datetime
     df["planned_timestamp"] = pd.to_datetime(
-        df["ssd"].astype(str) + " " + df["time_str"], errors="coerce"
+        df["ssd"].astype(str) + " " + df["chosen_time"],
+        errors="coerce"
     )
-    df["event_type"] = df["event_col"].map(EVENT_MAP)
+
+    # Event type
+    df["event_type"] = np.select(
+        [
+            df["act"].str.contains("TF", na=False),
+            df["act"].str.contains("TB", na=False),
+            (df["wtp"].notna() & ~df["act"].str.contains(r"T|D|U", na=False)),
+            df["act"].str.contains(r"T|D|U", na=False)
+        ],
+        ["ARRIVAL", "DEPARTURE", "PASS", "ARRIVAL"],
+        default="DEPARTURE"
+    )
 
     return df[keep_cols + ["planned_timestamp", "event_type"]]
 
