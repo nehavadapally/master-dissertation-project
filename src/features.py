@@ -94,16 +94,15 @@ def reshape_timetable_to_schedule(timetable_df, stations_df):
 
 def merge_on_station(left_df, right_df, join_col="station_code"):
     """Inner-join two DataFrames on a station column."""
-    return left_df.merge(right_df, on=join_col, how="inner")
+    return left_df.merge(right_df, left_on=["start_date",join_col], right_on = ['actual_date',join_col], how="inner")
 
 
 def merge_schedule_with_closures(expanded_road_df, schedule_df):
     """Merge expanded road closures with schedule on stanox, resolving suffix conflicts."""
     merged = expanded_road_df.merge(
-        schedule_df, on="stanox", how="inner",
+        schedule_df, left_on=['start_date',"stanox"], right_on = ['ssd','stanox'], how="inner",
         suffixes=("_road", "_schedule"),
     )
-
     # Keep schedule versions of duplicated columns
     merged["tpl"] = merged["tpl_schedule"]
     merged["station_code"] = merged["station_code_schedule"]

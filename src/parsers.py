@@ -50,7 +50,7 @@ def _journey_to_rows(journey):
             "rid": rid,
             "uid": uid,
             "trainId": train_id,
-            "ssd": ssd,
+            "ssd": pd.to_datetime(ssd).date(),
             "toc": toc,
             "stop_type": child.get("tag"),
             "tpl": stop.get("tpl"),

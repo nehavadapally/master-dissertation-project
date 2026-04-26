@@ -82,10 +82,10 @@ def load_stations_lookup():
     # Download or load cached files
     file_path = download_blob_by_name(
         CONTAINER_RAIL_ROAD_DATA,
-        "corpusextract.json",
+        "CORPUSExtract.json",
         RAIL_DIR
     )
-
+    
     raw = pd.read_json(file_path)
 
     def _parse(x):
@@ -206,10 +206,10 @@ def load_darwin_timetable(start_utc, end_utc):
         # Extract datetime from filename
         try:
             base = os.path.splitext(os.path.basename(blob.name))[0]
-            digits = "".join(c for c in base if c.isdigit())
+            digits = "".join(c for c in base if c.isdigit())[:14]
             file_dt = pd.to_datetime(digits, format="%Y%m%d%H%M%S", utc=True)
-        except Exception:
-            print(f"Could not parse timetable filename: {blob.name}")
+        except Exception as e:
+            print(f"Could not parse timetable filename: {blob.name}, Exception: {e}")
             continue
 
         # Check if blob is inside the requested window

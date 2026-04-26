@@ -46,16 +46,13 @@ def download_blob_by_name(container_name, blob_name, local_dir):
     os.makedirs(local_dir, exist_ok=True)
 
     safe_name = blob_name.replace("/", "_")
-    local_path = os.path.join(local_dir, safe_name)
-
+    local_path = os.path.join(local_dir, safe_name.lower())
     # If file already exists locally → skip download
     if not os.path.exists(local_path):
         blob_client = container.get_blob_client(blob_name)
         with open(local_path, "wb") as f:
             f.write(blob_client.download_blob().readall())
 
-    
-    print(local_path)
     return local_path
 
 def get_local_files_in_window(dir_path, start_utc, end_utc):
