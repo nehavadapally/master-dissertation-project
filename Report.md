@@ -23,6 +23,7 @@ The project pursues three research objectives:
 <p align="justify">
 This report documents the full arc of the project, from data source integration and exploratory analysis through to the modelling pipeline design and critical evaluation. Section 2 describes the data sources and infrastructure. Sections 3 through 5 present the exploratory analysis of each data source and the merged analytical datasets. Section 6 describes the modelling approach and planned evaluation strategy. Section 7 provides a critical assessment of the project's findings, limitations and commercial applicability.
 </p>
+
 ---
 
 ## Section 2: Data Sources & Infrastructure
