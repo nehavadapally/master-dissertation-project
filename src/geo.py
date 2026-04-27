@@ -1,4 +1,4 @@
-"""Geospatial utilities — haversine distance and closure-to-station matching."""
+"""Geospatial utilities - haversine distance and closure-to-station matching."""
 
 import numpy as np
 import pandas as pd

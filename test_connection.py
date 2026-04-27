@@ -52,7 +52,7 @@ def test_list_blobs():
             if suffix:
                 print(f"      {suffix}")
         except Exception as e:
-            print(f"   {name}: ERROR — {e}")
+            print(f"   {name}: ERROR - {e}")
     print()
 
 
@@ -63,7 +63,7 @@ def test_download_sample():
 
     count = download_blobs_in_window(CONTAINER_ROAD_CLOSURES, ROAD_DIR, start, end)
     if count > 0:
-        print(f"   Success — {count} file(s) saved to '{ROAD_DIR}'\n")
+        print(f"   Success - {count} file(s) saved to '{ROAD_DIR}'\n")
     else:
         print(f"   No blobs found in that window (try adjusting the dates)\n")
 

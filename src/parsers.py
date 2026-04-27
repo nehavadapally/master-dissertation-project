@@ -1,4 +1,4 @@
-"""File parsing utilities — CSV/JSON loader and Darwin timetable parser."""
+"""File parsing utilities - CSV/JSON loader and Darwin timetable parser."""
 
 import json
 

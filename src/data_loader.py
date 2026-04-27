@@ -1,4 +1,4 @@
-"""Data loading — fetches from Azure with local caching, returns DataFrames.
+"""Data loading - fetches from Azure with local caching, returns DataFrames.
 
 Each public function checks for local files first, downloads from Azure
 only if needed, and returns a clean DataFrame.
