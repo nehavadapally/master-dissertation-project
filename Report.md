@@ -130,10 +130,12 @@ The stations reference dataset (<code>gb_stations.csv</code>) contains 2,595 rec
 </p>
 
 <p align="justify">
+
 **Coverage and completeness:** The dataset carries 49 columns including station name, postcode, latitude, longitude, TLC, NLC, operator and annual footfall from 2005 to 2025. Missing values are concentrated in the older footfall columns (pre-2008), which is expected given reporting changes over time. All fields critical to the pipeline - latitude, longitude and TLC - are fully populated with no missing values across all the records.
 </p>
 
 <p align="justify">
+
 **Identifier crosswalk coverage:** Matching station TLC codes against the CORPUS 3ALPHA field confirms that 2,594 of 2,595 stations (≈ 99.96%) resolve successfully to a TIPLOC and STANOX code, leaving 1 unmatched record(s). This near-complete coverage means the spatial join can proceed without significant identifier loss. The CORPUS extract itself contains 55,920 TIPLOC records, of which 4,113 carry a 3ALPHA code.
 </p>
 
