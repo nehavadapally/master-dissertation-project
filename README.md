@@ -12,6 +12,7 @@ Predicts the probability of rail service delays caused by nearby road closures o
 rail-delay-prediction/
 ├── .env.example                        # Credential template (copy to .env)
 ├── .gitignore
+├── venv
 ├── requirements.txt
 ├── README.md
 ├── test_connection.py                  # Azure connection smoke test
@@ -121,7 +122,7 @@ Features used in the model, implemented in `features.py`:
 
 Four candidate models evaluated on the retrospective dataset with a temporal train/test split:
 
-- Logistic Regression (interpretable baseline)
+- Linear Regression (interpretable baseline)
 - Random Forest
 - Gradient Boosting
 - XGBoost
@@ -134,15 +135,15 @@ Primary evaluation metrics: ROC-AUC and F1 score (appropriate given class imbala
 
 | Finding | Value |
 |---------|-------|
-| Observation window | 10–12 April 2026 (72 hours) |
-| Road closures | 296 total — 200 planned, 96 unplanned |
+| Observation window | 10–13 April 2026 (72 hours) |
+| Road closures | 352 total — 214 planned, 138 unplanned |
 | Train moments (clean) | 39,091 rows — 38.1% delayed (variation_status) |
 | Raw delay distribution | Median 1 min, mean 2.53 min, max 293 min (skewness 12.31) |
 | Timetable stop rows | ~1.9M across ~121K journeys |
-| Retrospective dataset | 5,446 rows, 126 closures, 854 stations |
-| Prediction dataset | 100,069 rows, 190 closures, 1,467 stations |
-| Pearson r (distance vs delay) | –0.020 |
-| Pearson r (time diff vs delay) | +0.019 |
+| Retrospective dataset | 93,749 rows, 184 closures, 1373 stations |
+| Prediction dataset | 269,497 rows, 243 closures, 1,566 stations |
+| Pearson r (distance vs delay) | –0.010 |
+| Pearson r (time diff vs delay) | -0.002 |
 
 The weak linear correlation between spatial/temporal proximity and delay motivates a non-linear classification approach rather than regression.
 

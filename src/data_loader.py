@@ -9,6 +9,7 @@ import io
 import json
 import os
 import xml.etree.ElementTree as ET
+import requests
 
 from numpy import dtype
 import pandas as pd
@@ -28,10 +29,31 @@ from src.config import (
     RAIL_DIR,
     ROAD_DIR,
     TRAIN_DIR,
+    HSP_BASE_URL,
+    HSP_SERVICE_DETAILS_HEADERS 
 )
-from src.parsers import load_file, parse_darwin_timetable_files
+from src.parsers import load_file, parse_darwin_timetable_files, parse_service_details
+# ---------------------------------------------------------------------------
+# Road Network Data
+# ---------------------------------------------------------------------------
 
+def load_traffic_count_aadf():
+    """Load the AADF traffic count data, fetching from Azure if needed."""
+    file_path = download_blob_by_name(
+        CONTAINER_RAIL_ROAD_DATA,
+        "dft_traffic_counts_aadf.csv",
+        ROAD_DIR
+    )
+    return pd.read_csv(file_path)
 
+def laod_traffic_count_raw():
+    """Load the raw traffic count data, fetching from Azure if needed."""
+    file_path = download_blob_by_name(
+        CONTAINER_RAIL_ROAD_DATA,
+        "dft_traffic_counts_raw.csv",
+        ROAD_DIR
+    )
+    return pd.read_csv(file_path)
 # ---------------------------------------------------------------------------
 # Road closures
 # ---------------------------------------------------------------------------
@@ -243,3 +265,26 @@ def load_darwin_timetable(start_utc, end_utc):
     # ---------------------------------------------------------
     return parse_darwin_timetable_files(downloaded_files)
 
+def get_service_details(timetable_df):
+    url = f"{HSP_BASE_URL}/serviceDetails"
+    print("get service etails")
+    # print(timetable_df)
+    df = timetable_df[1:len(timetable_df)]
+    print(df)
+    for row in df:
+        print(row)
+        payload = {"rid": row['rid']}
+
+        try:
+            response = requests.post(url, json=payload, headers=HSP_SERVICE_DETAILS_HEADERS)
+
+            if response.status_code != 200:
+                print(f"Error for RID {row['rid']}:", response.text)
+                return None
+
+            if response.json():
+                return parse_service_details(response.json())
+            break
+        except Exception as e:
+            print(f"Exception for RID {row['rid']}:", e)
+            return None

@@ -2,7 +2,9 @@
 
 import os
 from string import digits
-
+import datetime
+from datetime import datetime, timezone
+import re
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
 
@@ -19,10 +21,41 @@ def download_blobs_in_window(container_name, local_dir, start_utc, end_utc):
     container = get_service_client().get_container_client(container_name)
     os.makedirs(local_dir, exist_ok=True)
     print(f"Connected to container: {container_name}")
+    # Pattern A/B: planned_20260411_050919.csv
+    pattern_with_underscore = re.compile(r"(\d{8})_(\d{6})")
+
+    # Pattern C: PPTimetable_20260410020459_v8.json
+    pattern_no_underscore = re.compile(r"(\d{14})")
 
     count = 0
     for blob in container.list_blobs():
-        if start_utc <= blob.last_modified <= end_utc:
+        base = os.path.basename(blob.name)
+
+        try:
+            
+            match = pattern_with_underscore.search(base)
+            if match:
+                date_part, time_part = match.groups()
+                timestamp_str = f"{date_part}_{time_part}"
+                blob_dt = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+
+            else:
+                
+                match = pattern_no_underscore.search(base)
+                if not match:
+                    raise ValueError("No timestamp found in filename")
+
+                timestamp_str = match.group(1)  
+                blob_dt = datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+
+            # Make timezone-aware
+            blob_dt = blob_dt.replace(tzinfo=timezone.utc)
+
+        except Exception as e:
+            print(f"Skipping blob '{blob.name}' (cannot parse timestamp): {e}")
+            continue
+
+        if start_utc <= blob_dt <= end_utc:
             blob_client = container.get_blob_client(blob.name)
             safe_name = blob.name.replace("/", "_")
             path = os.path.join(local_dir, safe_name)

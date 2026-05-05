@@ -55,3 +55,13 @@ RAIL_DIR = os.path.join(DATA_DIR, "rail")
 TRAIN_DIR = os.path.join(DATA_DIR, "train")
 DARWIN_DIR = os.path.join(DATA_DIR, "darwin")
 DARWIN_TIMETABLE_DIR = os.path.join(DATA_DIR, "darwin_timetable")
+
+
+HSP_SERVICE_DETAILS_API_KEY = os.environ["HSP_SERVICE_DETAILS_API_KEY"]
+
+HSP_BASE_URL = os.environ["HSP_BASE_URL"]
+HSP_SERVICE_DETAILS_HEADERS = {
+    "x-apikey": HSP_SERVICE_DETAILS_API_KEY,
+    "Content-Type": "application/json",
+    "User-Agent": "RailProject/1.0"
+}

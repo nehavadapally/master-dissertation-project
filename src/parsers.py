@@ -63,3 +63,27 @@ def _journey_to_rows(journey):
             "wtp": stop.get("wtp"),
         })
     return rows
+
+
+
+def parse_service_details(data):
+    details = data["serviceAttributesDetails"]
+
+    rid = details["rid"]
+    toc = details["toc_code"]
+    date = details["date_of_service"]
+
+    for loc in details["locations"]:
+        record = {
+            "rid": rid,
+            "date": date,
+            "toc": toc,
+            "location": loc["location"],
+            "planned_dep": loc.get("gbtt_ptd"),
+            "actual_dep": loc.get("actual_td"),
+            "planned_arr": loc.get("gbtt_pta"),
+            "actual_arr": loc.get("actual_ta"),
+            "cancel_reason": loc.get("late_canc_reason")
+        }
+    return pd.DataFrame([record])
+

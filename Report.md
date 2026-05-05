@@ -3,796 +3,747 @@
 
 ---
 
-## Section 1: Introduction
+## 1: Introduction
 <p align="justify">
-Unplanned closures on the Strategic Road Network (SRN) do not stay on the road. When a motorway is shut whether by an overnight maintenance window or an unexpected incident a share of the displaced traffic migrates to other modes. Rail stations near the closure see a sudden increase in demand: commuters who would have driven now join the platform, often at the same moment that operational rail capacity is at its most constrained. The result is a cross-modal disruption cascade that current transport operations systems are not designed to anticipate.
+Road closures and rail delays are tracked by separate organisations, reported through separate systems and managed by separate teams. That institutional separation makes operational sense. It also creates a blind spot. When a motorway closes, the disruption does not stay on the road. Drivers reroute. Some abandon their journey. Others switch to rail, arriving at stations in higher numbers than the timetable was built to absorb. The result is a demand spike that controllers cannot see coming because the signal is in a different system entirely.
 </p>
 <p align="justify">
-This project, developed in partnership with Kainos's Public Sector Transport Client Group, addresses that gap. A predictive tool that flags likely rail performance impacts within 60 minutes of a road closure opening would have direct commercial value in that context enabling controllers to pre-position resources, adjust timetable messaging and provide more accurate passenger information before delays materialise.
+This project asks whether that signal can be detected and acted on in time to matter. Using a 72-hour observation window across 10 to 13 April 2026, the study integrates five open and licensed data sources: National Highways DATEX II road closure feeds, Network Rail TRUST train movement records, Rail Delivery Group Darwin timetable snapshots, the CORPUS identifier crosswalk and the GB stations reference. All processing is implemented in Python, with data ingested and stored via Azure Blob Storage and spatial joins computed using vectorised haversine distance.
 </p>
 <p align="justify">
-The project builds a proof-of-concept early warning model using a 72-hour observation window (10–12 April 2026) and six integrated data sources: National Highways DATEX II road closure feeds, Network Rail TRUST train moment data, Rail Delivery Group Darwin timetable snapshots, the CORPUS identifier crosswalk and the GB stations reference. All sources are open or licensed under Rail Data Marketplace terms. Implementation is in Python using an Azure Blob Storage-backed pipeline, with spatial processing via vectorised haversine distance calculations and machine learning via scikit-learn and XGBoost.
-</p>
-<p align="justify">
-The project pursues three research objectives:
+The analysis operates at station level rather than journey level. Each row in the training dataset represents one train stopping at one station of a nearby road closure. This is a deliberate scoping decision: station-level events are directly observable in the TRUST feed, whereas journey-level delay requires chaining stops across a route identifier that is not consistently present in real-time data.
 </p>
 
-1.  <p align="justify"> <b>Quantify the relationship </b> between SRN/MRN unplanned closures and rail punctuality at stations within 10–25 km, using real-time train movement data over the observation window:</p>
-2. <p align="justify"> <b> Develop a proof-of-concept classification model</b> that uses road event metadata, spatial proximity and temporal context to forecast the probability of downstream rail delay within a 60-minute horizon:</p>
-3. <p align="justify"> <b> Deliver a reusable data pipeline </b> capable of producing both a retrospective analytical dataset (for model training) and a forward-looking timetable dataset (for live prediction), suitable for integration into a Transport Data Platform:</p>
 <p align="justify">
-This report documents the full arc of the project, from data source integration and exploratory analysis through to the modelling pipeline design and critical evaluation. Section 2 describes the data sources and infrastructure. Sections 3 through 5 present the exploratory analysis of each data source and the merged analytical datasets. Section 6 describes the modelling approach and planned evaluation strategy. Section 7 provides a critical assessment of the project's findings, limitations and commercial applicability.
+Three research questions organise the work:
+</p>
+
+<p align="justify"> <b>RQ1 </b> Do SRN/MRN road closures produce measurable delay at rail stations within 10 to 25 km?</p>
+<p align="justify"> <b> RQ2 </b> Can road event metadata, spatial proximity and temporal context forecast rail delay within a 60-minute horizon?</p>
+<p align="justify"> <b>RQ3 </b> What data pipeline architecture supports reproducible analysis and integration into an operational transport platform?</p>
+
+
+<p align="justify">
+Section 2 reviews the relevant literature. Section 3 sets out the motivation and value framing. Section 4 describes the data sources and system design. Section 5 presents exploratory analysis of each dataset. Section 6 covers the modelling pipeline and results. Section 7 evaluates the findings critically and sets out conclusions.
+</p>
+
+---
+## 2: Literature Review
+ 
+<p align="justify">
+Transport networks fail in ways that cross boundaries. The literature has approached this problem from five directions: multi-modal disruption theory, machine learning for transport prediction, geospatial data integration, the UK open data ecosystem, and explainability in operational models. Each contributes a piece. None puts them together in the way this project attempts.
+</p>
+
+### 2.1 Multi-Modal Disruption and Cascading Effects
+
+<p align="justify">
+The theoretical basis for cross-modal disruption sits in network science. Boccaletti et al. (2006) demonstrated that failure in one network layer can trigger disproportionate cascade effects in adjacent layers. The implication for transport is that a road closure is not self-contained. Its consequences extend beyond the carriageway and are not proportional to the size of the initial event.
+</p>
+<p align="justify">
+Cats, Koppenol and Warnier (2017) applied this directly to public transport, finding that partial road capacity reduction produces measurable secondary delays in transit services. Their modelling used simulated demand rather than observed real-time data, which limits direct applicability to operational prediction. It validates the premise but does not solve the forecasting problem.
+</p> 
+<p align="justify">
+UK-specific evidence is thinner. Taylor (2008) identified that Strategic Road Network incidents generate induced demand on parallel rail corridors, but worked from a small number of manually selected cases and made no attempt at forward prediction. Snelder, van Zuylen and Tavasszy (2012) found in a Dutch context that spatial proximity of road closures to rail interchange stations significantly mediates how disruption spreads. That finding is directly operationalised in the 10 to 25 km buffer used here.
+</p>
+<p align="justify">
+Mattsson and Jenelius (2015) reviewed the field and concluded that proactive near-real-time predictive frameworks remain rare. Rodriguez-Nunez and Garcia-Palomares (2014) made the same point from a different angle: most network resilience models assume static demand and cannot anticipate the dynamic redistribution triggered by unplanned events.
+</p>
+<p align="justify">
+The institutional dimension matters too. Network Rail performance reports decompose delays by attribution code covering infrastructure, operator and external causes, but road network conditions do not appear as a contributing variable in any standard framework (Network Rail, 2024; ORR, 2023). Road and rail are governed separately, measured separately and reported separately. Bridging that gap analytically requires working deliberately across institutional boundaries, which is precisely what an open-data cross-modal pipeline enables.
+ </p>
+
+### 2.2 Machine Learning for Transport Disruption Prediction
+
+<p align="justify">
+Logistic regression provides the interpretable baseline. Chung (2012) showed it achieves competitive accuracy for binary classification of freeway incident duration when feature engineering is thorough. The limitation is equally well established: it handles linear relationships cleanly but cannot capture the interaction effects that arise when heterogeneous inputs such as spatial proximity, event metadata and temporal context are combined.
+</p>
+<p align="justify">
+Random forests are the workhorse of the current literature. Breiman (2001) established the theoretical properties: robustness to overfitting, tolerance of missing values and native feature importance estimation. Wang et al. (2022) trained a random forest on Chinese high-speed rail delay data and identified historical delay patterns and weather as the strongest predictors. Neither the inputs nor the context match the present study, but the methodological framing transfers directly.
+</p>
+<p align="justify">
+Gradient boosting methods have demonstrated consistent state-of-the-art performance on tabular classification tasks. Ramos, Pereira and Ben-Akiva (2020) compared XGBoost against random forests and logistic regression for predicting rail service cancellations in Portugal, with XGBoost outperforming both alternatives on precision and recall for minority-class events. That class imbalance finding is directly relevant here: disruption events are underrepresented relative to normal operations in any historical dataset.
+</p>
+<p align="justify">
+Fernandez-Delgado et al. (2014) examined 179 classifiers across 121 datasets and found that feature quality consistently matters more than algorithm choice. This is the most practically important finding for this project: what goes into the model determines outcomes more reliably than which model processes it.
+</p>
+<p align="justify">
+Deep learning approaches including LSTM networks and hybrid architectures appear increasingly in the transport prediction literature (Zhao et al., 2017; Ma et al., 2021). Three limitations make them inappropriate here. First, they require large volumes of labelled sequential training data that a 72-hour window cannot provide. Second, they resist interpretation in ways that create friction with operational and regulatory requirements. Third, the engineering overhead is not justified at proof-of-concept scale.
+</p>
+
+### 2.3 Geospatial Data Integration
+
+<p align="justify">
+The causal logic of this project is spatial before it is statistical. Buffer analysis, which generates proximity zones around point or line geometries, has a long application history in transport research. Gutierrez and Garcia-Palomares (2008) used buffer-based spatial joins to assess road network changes on public transport catchment accessibility. Cheng et al. (2020) applied spatial joins to bus service reliability and road incident co-occurrence in Shenzhen, finding that incidents within 2 km of bus stops produced measurable reliability degradation. Rail catchments are larger and the spatial logic scales accordingly.
+</p>
+
+<p align="justify">
+The 10 to 25 km buffer adopted here reflects Frei, Kuhnimhof and Axhausen (2017), who estimated rail station access catchments in mixed urban-rural geographies comparable to SRN corridor contexts. Cross-modal spatial joining of this kind has no direct published precedent, which is part of what makes the methodology a contribution.
+</p>
+
+### 2.4 UK Open Transport Data
+<p align="justify"> 
+The UK has one of the more comprehensive open transport data ecosystems in Europe. Shaw, Docherty and Gather (2019) evaluated DATEX II data quality in a UK operational context and found significant variability in record completeness, particularly in cause type and location reference fields. An event record with missing geometry cannot be spatially joined to a rail asset, so imputation and fallback handling are not optional preprocessing steps.
+</p>
+<p align="justify"> 
+Yap, Cats and van Arem (2018) used Darwin-equivalent real-time data in a Dutch context to evaluate train delay propagation models, finding that station-level actual versus planned time differences were the most predictive short-term delay signals. Palmqvist, Olsson and Hiselius (2017) identified the identifier alignment challenge covering STANOX to TIPLOC to CRS as a recurring practical barrier in Scandinavian rail research. It is no less real in the UK context. The CORPUS crosswalk, covering 55,920 TIPLOC records, is the mechanism that resolves it here.
+</p>
+
+### 2.5 Explainability in Operational ML
+
+<p align="justify">
+A model that performs well in predictive terms may still not be usable in an operational context. Operators must understand the basis for a disruption prediction and assess whether it accords with established domain knowledge.
+</p>
+
+<p align="justify">
+Lundberg and Lee (2017) introduced SHAP values, grounded in cooperative game theory, as locally faithful explanations for individual predictions from any model class. Mehrabi et al. (2021) demonstrated their use in transport safety modelling, showing that attribution outputs enabled domain experts to identify spurious correlations that would otherwise be invisible in a black-box system. That validation function matters here: the hypothesised causal direction is that road closures cause rail delays, but adverse weather could simultaneously produce both road events and rail delays, creating an apparent relationship where none exists independently.
+</p>
+<p align="justify">
+The regulatory context reinforces the technical case. The ORR requires that performance attribution processes be auditable and defensible (ORR, 2023). The National Data Strategy (DCMS, 2021) establishes transparency expectations for algorithmic tools used in public infrastructure contexts. A classifier whose decisions cannot be articulated is not deployable in this environment, regardless of its predictive accuracy.
+</p>
+
+### 2.6 The Gap
+<p align="justify">
+No published study has built a predictive model targeting cross-modal road-to-rail disruption at national scale using open data, geospatially derived proximity features and interpretable classifiers. The methodological components exist separately in the literature. The integration does not. That is the gap this project addresses.
 </p>
 
 ---
 
-## Section 2: Data Sources & Infrastructure
+## 3: Motivation
+ 
 <p align="justify">
-The project integrates six open and licensed data sources, ingested through a Python-based pipeline backed by Azure Blob Storage and Apache Kafka. All credentials are managed via environment variables loaded through a <code>.env</code> file, keeping secrets out of source control. A local file caching layer ensures that once a blob is downloaded it is not re-fetched on subsequent runs, making iterative analysis practical without repeated outbound data transfer from the cloud.
-</p>
-
-### 2.1 National Highways DATEX II Feeds 
-
-<p align="justify">
-Road closure data is sourced from the <a href="https://developer.data.nationalhighways.co.uk/api-details#api=road-and-lane-closures-v2&operation=RoadClosures"> National Highways DATEX II API </a>, which publishes planned and unplanned closures on the Strategic Road Network (SRN) in XML format. Each response follows the <code>SituationPublication</code> schema, with each closure represented as a <code>SituationRecord</code> carrying temporal bounds (<code> overallStartTime </code>, <code>overallEndTime</code>), a cause type, a validity status and a location reference. Location geometry varies across three cases: a polyline encoded as a space-separated <code>posList</code> (multiple or single linear locations) or a point coordinate pair (incident-type records). The parser extracts a centroid latitude and longitude in all three cases, producing a consistent spatial representation for downstream joining.
-</p>
-
-<p align="justify">
-Fields retained for analysis: <code>situation_id</code>, <code>start_time</code>, <code>end_time</code>, <code>validity_status</code>, <code>cause_type</code>, <code>source</code>, <code>road_name</code>, <code>lanes_closed</code>, <code>closure_lat</code>, <code>closure_lon</code>, <code>poslist</code> and <code>closure_type</code> (derived from filename: planned or unplanned). Parsed records are uploaded to the <code>road-closures</code> Azure Blob container as timestamped CSV files.
-</p>
-
-### 2.2 Network Rail TRUST - Train Moments
-<p align="justify">
-Real-time train movement data is consumed from a Kafka topic provided through the  <a href="https://raildata.org.uk/dashboard/dataProduct/P-826477b8-3789-45e7-85bd-22c4ae9bcfae/overviews"> Network Rail TRUST </a> data feeds. A Confluent Kafka consumer, configured with SASL/SSL authentication, polls the topic continuously and batches records into uploads of 100 records per batch. Each message contains a header and a body, the body carries the train identifier, actual and planned Unix millisecond timestamps, location STANOX code, event type (arrival or departure), variation status (LATE, EARLY, ON TIME, OFF ROUTE) and timetable variation in minutes. A binary <code>is_delayed</code> flag is derived at ingestion time from the variation status field.
+Transport operations in Great Britain are managed through separate institutional frameworks for road and rail. National Highways oversees the Strategic Road Network (SRN); Network Rail manages the rail infrastructure; and the two systems exchange limited operational data in real time. This separation is administratively coherent but creates a structural gap in situational awareness. When a road closure displaces traffic, a portion of affected travellers shifts to rail. The receiving stations experience elevated demand that is not anticipated in the timetable, not visible to the control room and not reflected in any standard performance monitoring framework.
 </p>
 <p align="justify">
-Parsed records are uploaded to the <code>train-moments</code> Azure Blob container as timestamped CSV files, with file rotation triggered after 2000 total records to keep individual files manageable.
+During the 72-hour observation window used in this study (10 to 13 April 2026), <strong>352 road closures</strong> were recorded across the SRN. Of these, <strong>138 were unplanned</strong>, arising from incidents with no advance notice. Across the same period, <strong>1,566 rail stations</strong> fell within 10 to 25 kilometres of at least one active closure, with scheduled services operating throughout. The rail control room had no mechanism to connect these two facts. The data existed in both systems. The link between them had not been made.
+</p>
+<p align="justify">
+This project is motivated by that gap. The central proposition is that road event metadata, available in near real time through the National Highways DATEX II feed, contains sufficient signal to anticipate likely downstream rail disruption within a 60-minute horizon. If that proposition holds, it enables a qualitatively different kind of operational response: one that is anticipatory rather than reactive, and grounded in cross-modal data rather than within-mode observation alone.
 </p>
 
-### 2.3 Darwin Timetable Feeds
-
+### 3.1 Intended Readership
+ 
 <p align="justify">
-Planned timetable data is sourced from the <a href="https://raildata.org.uk/dashboard/dataProduct/P-9ca6bc7e-62e1-44d6-b93a-1616f7d2caf8/overview"> Rail Delivery Group </a>Darwin push port, which publishes full timetable snapshots as large XML files. Each file is streamed and parsed incrementally using <code>iterparse</code> to avoid loading the full document into memory, extracting one <code>Journey</code> element at a time. Each journey carries a route identifier (<code>rid</code>), train identifier(<code>trainId</code>), service date (<code>ssd</code>) and train operating company (<code>toc</code>), with child elements representing individual stops typed as origin (<code>OR</code>), intermediate (<code>IP</code>), pass (<code>PP</code>) or destination (<code>DT</code>). Planned working times (<code>wta</code>, <code>wtd</code>, <code>wtp</code>) and public times (<code>pta</code>, <code>ptd</code>) are extracted per stop.
+This report is addressed to two distinct audiences, each with different priorities.
+</p>
+<p align="justify">
+<strong>Transport operations and data teams</strong> working on integrated platform development will find the pipeline architecture, identifier crosswalk design and data source integration most relevant. The system design decisions documented in Section 4 are intended to be directly reusable in a production context.
+</p>
+<p align="justify">
+<strong>Analytical and research teams</strong> working on cross-modal disruption modelling will find the EDA findings and modelling results most relevant. In particular, the null modelling result documented in Section 6 sets a clear baseline and quantifies the data requirements for the problem, which is itself a contribution to the methodological literature.
 </p>
 
+### 3.2 Station Level vs Journey Level
+ 
 <p align="justify">
-Parsed journeys are serialised as JSON and stored in the <code>darwin-timetable-feeds</code> container. Unlike the train moments feed, the timetable provides forward-looking scheduled timestamps for services not yet operated, enabling the pipeline to generate predictions before outcomes are observed.
+A foundational scoping decision in this project concerns the unit of analysis. Rail delay can be examined at the <strong>journey level</strong>, tracking the aggregate performance of a complete service from origin to destination, or at the <strong>station level</strong>, examining each individual stop event independently.
 </p>
-
-### 2.4 Station Reference Data
-
 <p align="justify">
-Two station reference sources are combined to produce the spatial and identifier lookup used throughout the pipeline.
+This project operates at <strong>station level</strong>. The primary reason is data availability. The Network Rail TRUST feed records each train movement as a discrete event with its own actual and planned timestamp, location identifier and variation status. Journey-level modelling would require linking these events across a common route identifier that is not consistently available in the real-time data stream. Station-level modelling is the tractable and data-consistent approach for this proof of concept.
 </p>
 
 <p align="justify">
-<a href="https://www.doogal.co.uk/UkStations"> GB Stations </a>(<code>gb_stations.csv</code>) provides 2,595 station records with latitude, longitude, three-letter code (TLC), NLC, operator and annual footfall figures from 2005 to 2025. This is the primary spatial reference for the haversine distance join.
+It is also the operationally appropriate unit for an early warning application. A controller responding to a closure opening needs to know which stations in the vicinity are likely to experience elevated delay in the next hour, not the complete delay profile of a specific long-distance service. Station-level prediction produces actionable output at the right granularity for that decision. Journey-level modelling is identified as a priority extension in Section 7.
+</p>
+
+### 3.3 Value Realisation
+ 
+<p align="justify">
+The immediate deliverable of this project is a reproducible data pipeline that integrates road and rail data sources at national scale and produces two analytical datasets: a labelled retrospective dataset for model training (93,749 rows) and a forward-looking timetable dataset for prediction (269,497 rows). The pipeline is designed to be re-run against any future time window without modification.
+</p>
+<p align="justify">
+The modelling result from the current 72-hour window is a null finding: no individual-service predictive signal was detected with the available feature set. This is not a failure of the pipeline architecture. It is a data volume constraint. The natural variance in rail delay (standard deviation 5.38 minutes) requires substantially more training data to detect a weak cross-modal effect with statistical confidence. A 4 to 12 week observation window covering both weekday peak and weekend patterns is the single highest-priority extension.
 </p>
 
 <p align="justify">
-<a href="https://raildata.org.uk/dashboard/dataProduct/P-9d26e657-26be-496b-b669-93b217d45859/overview"> CORPUS Extract </a> (<code>CORPUSExtract.json</code>) provides 55,920 TIPLOC records mapping between STANOX (signalling location codes used in train moments), TIPLOC (timetable location codes used in Darwin) and 3ALPHA codes (equivalent to TLC).
+Beyond the immediate scope, the pipeline architecture supports three extensions that increase commercial value progressively. <strong>Street Manager integration</strong> would add emergency permit data for unplanned works, which is the closure category with the shortest lead time and therefore the greatest need for early warning. <strong>Annual Average Daily Flow (AADF) features</strong> from the Department for Transport road traffic count dataset would allow the model to weight closures by the volume of traffic they displace, distinguishing between a major motorway incident and a minor A-road closure that happen to share similar DATEX II record structures. <strong>Journey-level modelling</strong> via route identifier chaining in the Darwin timetable would allow the system to surface specific services at risk rather than aggregating to station level.
 </p>
 
+---
+
+### 4.1 Data Sources
+ 
+| Source | Format | Volume | Update frequency | Container |
+|---|---|---|---|---|
+| National Highways DATEX II | XML via REST | 352 records / 72 hrs | Near real-time | `road-closures` |
+| Network Rail TRUST | JSON via Kafka | 40,949 records / 72 hrs | Real-time stream | `train-moments` |
+| Darwin Timetable | XML via Azure Blob | 190,410 stop rows | Daily snapshot | `darwin-timetable-feeds` |
+| GB Stations (Doogal) | CSV | 2,595 records | Static | `rail-road-data` |
+| CORPUS Extract | JSON | 55,920 TIPLOC records | Periodic | `rail-road-data` |
+
+<p align="justify">
+<a href="https://developer.data.nationalhighways.co.uk/api-details#api=road-and-lane-closures-v2&operation=RoadClosures"> National Highways DATEX II API </a> publishes planned and unplanned closures on the Strategic Road Network. Each record carries temporal bounds, a cause type, a validity status and a location reference. Location geometry varies across three cases: a polyline encoded as a space-separated coordinate list, a single linear location or a point coordinate pair for incident-type records. The parser extracts a centroid latitude and longitude in all three cases, producing a consistent spatial representation for downstream joining.
+</p>
+<p align="justify">
+<a href="https://raildata.org.uk/dashboard/dataProduct/P-826477b8-3789-45e7-85bd-22c4ae9bcfae/overviews"> Network Rail TRUST  Movements</a> are consumed from a Kafka topic via a Confluent consumer configured with SASL/SSL authentication. Each message body carries the train identifier, actual and planned Unix millisecond timestamps, location STANOX code, event type, variation status and timetable variation in minutes. A binary <code>is_delayed</code> flag is derived at ingestion from the variation status field. Records are batched and uploaded to Azure Blob Storage as timestamped CSV files with file rotation triggered at 2,000 records.
+</p>
+<p align="justify">
+<a href="https://raildata.org.uk/dashboard/dataProduct/P-9ca6bc7e-62e1-44d6-b93a-1616f7d2caf8/overview">Darwin timetable</a> files are published as full timetable snapshots in XML format. Files are streamed and parsed incrementally using <code>iterparse</code> to avoid loading the full document into memory. Each journey carries a route identifier (<code>rid</code>), train identifier (<code>trainId</code>), service date (<code>ssd</code>) and operating company (<code>toc</code>), with child elements representing individual stops typed as origin, intermediate, pass or destination. Working times and public times are extracted per stop. Unlike the TRUST feed, the timetable provides forward-looking scheduled timestamps for services not yet operated, enabling prediction before outcomes are observed.
+</p>
+<p align="justify">
+<a href="https://www.doogal.co.uk/UkStations">GB Stations</a> provides 2,595 station records with latitude, longitude, three-letter code (TLC), NLC, operator and annual footfall from 2005 to 2025. This is the primary spatial reference for the haversine distance join. 
+
+<a href="https://raildata.org.uk/dashboard/dataProduct/P-9d26e657-26be-496b-b669-93b217d45859/overview">CORPUS</a> provides 55,920 TIPLOC records mapping between STANOX codes used in TRUST, TIPLOC codes used in Darwin and 3ALPHA codes equivalent to TLC. This crosswalk is the mechanism that links all three data sources through a common station identifier.
+</p>
+
+---
+## 4.2 Entity Relationship Diagram
+```mermaid
+erDiagram
+    %% ------------------------------------------------
+    %% ROAD CLOSURES
+    %% ------------------------------------------------
+    ROAD_CLOSURES {
+        string situation_id PK
+        datetime start_time
+        datetime end_time
+        string closure_type
+        float closure_lat
+        float closure_lon
+        string distance_in_km(derived)
+        string station_code(derived)
+        string stanox(derived)
+    }
+
+    %% ------------------------------------------------
+    %% TRAIN Movements
+    %% ------------------------------------------------
+    TRAIN_Movements {
+        string train_id PK
+        datetime actual_timestamp
+        datetime planned_timestamp
+        string loc_stanox FK
+        string station_code(derived) FK
+    }
+
+    %% ------------------------------------------------
+    %% DARWIN TIMETABLE
+    %% ------------------------------------------------
+    DARWIN_TIMETABLE {
+        string rid PK
+        date ssd
+        string tpl FK
+        time planned_timestamp
+        string stanox(derived)
+        string more_columns_not_shown
+    }
+
+    %% ------------------------------------------------
+    %% STATIONS
+    %% ------------------------------------------------
+    STATIONS {
+        string tlc(station_code) PK
+        string station    
+        float latitude
+        float longitude
+        float nlc
+        string stanox
+        string tiploc
+        string more_columns_not_shown
+    }
+
+    
+
+    %% ------------------------------------------------
+    %% RELATIONSHIPS
+    %% ------------------------------------------------
+    ROAD_CLOSURES ||--o{ STATIONS : "spatial join 10–25 km"
+    ROAD_CLOSURES ||--o{ TRAIN_Movements : "start_date = actual_date AND station_code"
+    
+    ROAD_CLOSURES ||--o{ DARWIN_TIMETABLE : "start_date = ssd AND stanox"
+    %% Spatial joins (Road → Rail)
+
+    
+    
+
+```
+---
+
+## 4.3 Identifier Crosswalk Flow
+
+```mermaid
+flowchart LR
+    
+    CO["CORPUS · stanox · tiploc · 3alpha "]
+    ST["Stations records 
+  tlc(station_code) · lat · lon · tiploc · stanox"]
+    TM["Train Movements · loc_stanox"]
+    DT["Darwin Timetable · tpl"]
+    MR["Merged dataset · haversine join to road closures"]
+
+    CO -->|"3alpha = tlc (station_code)"| ST
+    ST -->|"lat · lon"| MR
+    ST -->|"loc_stanox = stanox → tlc (derived)"| TM
+    ST -->|"tpl = tiploc"| DT
+```
 <p align="justify">
 This crosswalk is essential for linking train movement records which carry STANOX -> to the station coordinate table which is indexed by TLC.
 </p>
 
-<p align="justify">
-Both files are stored in the <code>rail-road-data</code> container and cached locally on first download.
-</p>
-
-### 2.5 Pipeline Architecture
+---
+## 4.4 Pipeline Architecture
 
 <p align="justify">
-The overall pipeline is structured in four layers:
+The pipeline is structured in four layers: ingestion, storage, processing and analytical output. Each layer is independently replaceable. The processing logic in the <code>src/</code> library is decoupled from both the ingestion mechanism and the storage layer, which means switching from batch to event-driven scoring requires a scheduling change rather than a pipeline rewrite.
 </p>
 
-<p align="justify">
 
-1. **Ingestion** - Road closures are fetched on demand via a REST API call, train moments and Darwin timetable data are consumed from Kafka topics or downloaded from Azure containers depending on whether live or historical data is required.
-</p>
-<p align="justify">
+```mermaid
+flowchart LR
 
-2. **Storage** - All raw data lands in Azure Blob Storage across five containers (<code>road-closures</code>, <code>train-moments</code>, <code>darwin-realtime-feeds</code>, <code>darwin-timetable-feeds</code>, <code>rail-road-data</code>). A local caching module checks for existing files before issuing download requests, filtering by filename-encoded timestamps against the requested time window.
-</p>
+%% ============================
+%% SOURCES
+%% ============================
+subgraph SOURCES["Data sources"]
+    direction TB
 
-<p align="justify">
+    A1["Road closures · National Highways"]
+    A2["NWR Train Movements · Rail Data Marketplace"]
+    A3["Darwin Timetable Files · Rail Data Marketplace"]
 
-3. **Processing** - A <code>src/</code> directory is used to organise the python modules responsible for parsing (<code>parsers.py</code>), spatial operations (<code>geo.py</code>), feature engineering (</code>features.py</code>) and data loading with caching (<code>data_loader.py</code>, <code>azure_client.py</code>). Configuration is centralised in <code>config.py</code> and loaded from environment variables at runtime.
-</p>
+    subgraph REF["Reference Data"]
+        direction TB
+        A4a["Stations"]
+        A4b["CORPUS"]
+    end
+end
 
-<p align="justify">
+%% Clickable links
+click A1 "https://developer.data.nationalhighways.co.uk/api-details#api=road-and-lane-closures-v2&operation=RoadClosures" "Open National Highways closures"
+click A2 "https://raildata.org.uk/dashboard/dataProduct/P-826477b8-3789-45e7-85bd-22c4ae9bcfae/overview" "Open Train Movements"
+click A3 "https://raildata.org.uk/dashboard/dataProduct/P-9ca6bc7e-62e1-44d6-b93a-1616f7d2caf8/overview" "Open Darwin Timetable"
+click A4a "https://www.doogal.co.uk/UkStations" "Open Stations"
+click A4b "https://raildata.org.uk/dashboard/dataProduct/P-9d26e657-26be-496b-b669-93b217d45859/overview" "Open CORPUS"
 
-4. **Analysis** - Six exploratory notebooks (<code>eda_01</code> through <code>eda_06</code>) and a modelling notebook consume the processed parquet outputs. Each EDA notebook saves a cleaned parquet to <code>data/processed/</code>, which downstream notebooks read directly, avoiding repeated re-processing.
-</p>
+%% ============================
+%% STORAGE
+%% ============================
+subgraph STORAGE["Ingestion + storage - Azure Blob Storage"]
+    direction TB
+    B1["road-closures"]
+    B2["train-movements"]
+    B3["darwin-timetable-feeds"]
+    B4["rail-road-data"]
+end
 
+%% ============================
+%% PROCESSING
+%% ============================
+subgraph PROCESSING["Processing - src/lib"]
+    direction TB
+
+    C1["parsers.py<br/>CSV · JSON · XML"]
+    C2["geo.py<br/>Haversine join"]
+    C3["features.py<br/>Reshape · filter · delay"]
+    C4["data_loader.py<br/>Load + cache"]
+end
+
+%% ============================
+%% OUTPUTS
+%% ============================
+subgraph OUTPUTS["Analytical outputs"]
+    direction TB
+    D1["Retrospective dataset<br/>93,749 rows · delay label"]
+    D2["Prediction dataset<br/>269,497 rows · no label"]
+    D3["Modelling notebook<br/>Train · predict · evaluate"]
+end
+
+%% ============================
+%% FLOWS
+%% ============================
+A1 --> B1
+A2 --> B2
+A3 --> B3
+A4a --> B4
+A4b --> B4
+
+B1 --> C1
+B2 --> C1
+B3 --> C1
+B4 --> C4
+
+C1 --> C2
+C2 --> C3
+C3 --> C4
+
+C4 --> D1
+C4 --> D2
+D1 --> D3
+D2 --> D3
+```
 ---
 <p align="justify">
 
-> **Key findings - Section 2**
-> - Six data sources integrated across road, rail and station reference domains, all open or licensed under Rail Data Marketplace terms
-> - Kafka-based ingestion for real-time train moments, REST + Azure Blob for road and timetable data
-> - Local file caching reduces cloud data transfer on iterative runs, timestamp-based filename filtering enables precise time-window queries
-> - CORPUS crosswalk bridges the STANOX-TIPLOC-TLC identifier gap across all three data sources
-
+> **Key findings Section 4**
+> - Five data sources integrated across road, rail and reference domains via a four-layer Azure-backed pipeline
+> - CORPUS crosswalk resolves the STANOX to TIPLOC to TLC identifier gap across all three data sources
+> - 99.96 percent of stations (2,594 of 2,595) successfully crosswalked with no coordinate gaps
+> - Local file caching avoids repeated cloud data transfer on iterative runs
+> - Temporal filter produces uniform bucket distribution confirming no systematic bias
 </p>
 
+
+
+## 5: Exploratory Data Analysis
+ 
+<p align="justify">
+Each data source is examined independently before any joining takes place. The purpose is to establish data quality, identify structural characteristics that affect downstream modelling decisions and surface findings that are meaningful in their own right.
+</p>
+
+### 5.1 Stations Reference (EDA 01)
+ 
+**Source:** `gb_stations.csv` merged with CORPUS via TLC to 3ALPHA crosswalk
+
+**Output:** `stations_reference.parquet` with 2,594 rows x 8 columns
+ 
+| Field | Type | Example | Notes |
+|---|---|---|---|
+| `tlc` | string | `CLJ` | Primary key, three-letter station code |
+| `station` | string | `Clapham Junction` | Station name |
+| `latitude` | float | `51.4642` | No missing values across all records |
+| `longitude` | float | `-0.1706` | No missing values across all records |
+| `stanox` | string | `87701` | From CORPUS, links to TRUST feed |
+| `tiploc` | string | `CLPHMJW` | From CORPUS, links to Darwin timetable |
+| `owner` | string | `South Western Railway` | 34 distinct operators |
+| `footfall_2025` | int | `109,457,000` | Entries and exits, right-skewed distribution |
+ 
+**Key findings:**
+- 2,595 raw records; 2,594 after CORPUS crosswalk, 99.96 percent match rate on STANOX and TIPLOC
+- 34 operators largest by station count: Northern Trains (482), ScotRail (360), Transport for Wales (248), Great Western Railway (201), South Western Railway (176)
+- All spatial fields fully populated, no coordinate gaps
 ---
 
-## Section 3: Exploratory Data Analysis - Reference & Road Data
+### 5.2 Road Closures (EDA 02)
+ 
+**Source:** National Highways DATEX II REST API
 
-<p align="justify">
-Before any spatial or temporal joining takes place, each data source is examined independently. This section covers the two foundational reference datasets: the GB stations reference (EDA 01) and the road closures extract (EDA 02). Understanding the structure, quality and operational characteristics of each source in isolation informs every design decision made in the join pipeline.
-</p>
+**Output:** `road_closures_clean.parquet` with 352 rows x 14 columns; 0 percent missing on all critical fields
+ 
+| Field | Type | Example | Notes |
+|---|---|---|---|
+| `situation_id` | string | `484725` | Unique closure identifier |
+| `start_time` | datetime | `2026-04-10 19:00` | UTC, planned closures cluster 18:00 to 21:00 |
+| `end_time` | datetime | `2026-04-11 05:00` | UTC |
+| `closure_type` | string | `planned` | planned or unplanned |
+| `validity_status` | string | `suspended` | planned / active / suspended |
+| `cause_type` | string | `roadMaintenance` | 4 categories; perfectly correlated with closure type |
+| `closure_lat` | float | `51.91` | Centroid extracted from all 3 DATEX II geometry cases |
+| `closure_lon` | float | `-1.47` | No missing coordinates |
+| `lanes_closed` | int | `1` | Range 0 to 4; 155 records carry 0 (full carriageway) |
+| `road_name` | string | `M40` | SRN motorways and major A-roads |
+ 
 
-### 3a. GB Stations Reference (EDA 01)
-<p align="justify">
-The stations reference dataset (<code>gb_stations.csv</code>) contains 2,595 records covering GB rail stations, loaded via <code>data_loader.load_stations()</code> and merged with the CORPUS extract via the TLC / 3ALPHA crosswalk. The merged output is saved as <code>data/processed/stations_reference.parquet</code> and consumed by all downstream notebooks.
-</p>
+![Alt text](notebooks\figures\eda_02\active_closures_timeline.png)
 
-<p align="justify">
+**Key findings:**
+- 352 records; 214 planned, 138 unplanned; 0 percent missing on all critical fields
+- Cause type and closure type are perfectly correlated,  `roadOrCarriagewayOrLaneManagement` appears exclusively in unplanned records sourced from Signs and Signals
+- Planned closures start times cluster 18:00 to 21:00 UTC, unplanned closures distributed across the day
+- Duration range 0.25 to 17,544 hours, median 8 hours, mean 746 hours inflated by 41 long-running works extending to 2028
+- 155 records carry zero lanes closed indicating full carriageway closure rather than partial lane restriction
 
-**Coverage and completeness:** The dataset carries 49 columns including station name, postcode, latitude, longitude, TLC, NLC, operator and annual footfall from 2005 to 2025. Missing values are concentrated in the older footfall columns (pre-2008), which is expected given reporting changes over time. All fields critical to the pipeline - latitude, longitude and TLC - are fully populated with no missing values across all the records.
-</p>
 
-<p align="justify">
-
-**Identifier crosswalk coverage:** Matching station TLC codes against the CORPUS 3ALPHA field confirms that 2,594 of 2,595 stations (≈ 99.96%) resolve successfully to a TIPLOC and STANOX code, leaving 1 unmatched record(s). This near-complete coverage means the spatial join can proceed without significant identifier loss. The CORPUS extract itself contains 55,920 TIPLOC records, of which 4,113 carry a 3ALPHA code.
-</p>
-
-<p align="justify">
-
-**Operator distribution:** The 2,595 stations are managed by 34 distinct train operating companies. The largest operators by station count are 482 and 360 stations, reflecting the geographic concentration of Northern Trains and ScotRail networks. This distribution is relevant context for interpreting which parts of the network appear most frequently in the merged analytical dataset.
-</p>
-
-<p align="justify">
-
-**Geographic extent:** Stations span latitudes from 50.1217 to 58.5902 and longitudes from -5.8391 to 1.7497, covering the full extent of the GB mainland network. No stations are missing coordinate values, confirming the dataset is spatially complete for the haversine join.
-</p>
-
-<p align="justify">
-
-**Footfall trends:** National annual footfall across all stations shows a long term  pattern:
-- 2005-2019: steady growth (≈1.55B → 3.04B journeys)
-- 2020-2021: sharp disruption due to COVID-19, with a low of 0.69B in 2021
-- 2022-2025: strong recovery, reaching 3.05B in 2025, slightly exceeding pre-pandemic levels
-</p>
-
-<p align="justify">
-The top 15 busiest stations by 2025 footfall account for a disproportionate share of total entries and exits, consistent with the expected right-skewed distribution of station usage. Footfall data is not used directly in the model but provides useful context for interpreting which stations carry the highest operational risk from road-induced disruption.
-</p>
-
----
-<p align="justify">
-
-> **Key findings - 3a: Stations reference**
-> - 2,595 GB(Great Britain) stations with complete lat/lon and TLC coverage
-> - 2,594 of 2,595 stations successfully crosswalked to TIPLOC and STANOX via CORPUS - ≈ 99.96% match rate
-> - 34 distinct operators, largest by station count: 482
-> - Footfall distribution is heavily right-skewed, top stations dominate national totals
-> - Dataset is spatially complete and fit for haversine join with no cleaning required
-
-</p>
-
+ 
 ---
 
-### 3b. Road Closures (EDA 02)
-<p align="justify">
+### 5.3 Train Moments (EDA 03)
+ 
+**Source:** Network Rail TRUST via Kafka consumer; 359 files from `train-moments` container
+**Output:** `train_moments_clean.parquet` with 39,091 rows x 19 columns (cleaned from 40,949 raw)
+ 
+| Field | Type | Example | Notes |
+|---|---|---|---|
+| `train_id` | string | `842L98M727` | Headcode  |
+| `actual_timestamp` | datetime | `2026-04-10 08:32:00` | Converted from Unix ms; 4.5 percent missing raw |
+| `planned_timestamp` | datetime | `2026-04-10 08:31:00` | Converted from Unix ms; 5.6 percent missing raw |
+| `loc_stanox` | string | `87701` | Location code, resolved to TLC via CORPUS |
+| `event_type` | string | `DEPARTURE` | DEPARTURE 57.4 percent, ARRIVAL 37.9 percent |
+| `variation_status` | string | `LATE` | LATE / EARLY / ON TIME / OFF ROUTE |
+| `timetable_variation` | int | `1` | Signed delay in minutes |
+| `is_delayed` | int | `1` | Derived, 1 if variation_status = LATE |
+| `station_code` | string | `CLJ` | TLC resolved via STANOX to 3ALPHA; 27.3 percent missing |
+| `delay_monitoring_point` | bool | `True` | Official punctuality timing point; 46.0 percent True |
+| `data_source` | string | `SMART` | SMART 88.4 percent; GPS and TSIA supplement |
 
-Road closure data was retrieved for a 72 hour window spanning 10 April 2026 to 12 April 2026 (UTC), loaded via <code>data_loader.load_road_closures()</code> from the <code>road-closures</code> Azure Blob container. The raw dataset contains 296 records across 14 columns, saved as <code>data/processed/road_closures_clean.parquet</code>.
-</p>
-<p align="justify">
-
-**Completeness:** A missing value audit across all 14 fields confirms that no critical fields - <code>closure_lat</code>, <code>closure_lon</code>, <code>start_time</code>, <code>end_time</code>, <code>closure_type</code> - carry any missing values. This is notable given the varied geometry cases in the DATEX II schema; the parser successfully extracts a centroid coordinate in all cases.
-</p>
-
-
-**Closure type and validity status:** 
-
-Records split into:
-| type    | count |
-|-----------|-------|
-| planned   | 200   | 
-| unplanned | 96    | 
-
-Validity status breaks down as: 
-| status    | count |
-|-----------|-------|
-| planned   | 186   | 
-| suspended | 96    | 
-| active    | 14    | 
-
-<p align="justify">
-
-A cross-tabulation of closure type against validity status reveals a clean separation: all unplanned closures carry a <code>suspended</code> validity status, while planned closures are split between <code>planned</code> and <code>active</code>.
-
-</p>
-
-![alt text](image.png)
-
-<p align="justify">
-This structural pattern reflects how the DATEX II feed distinguishes incident-driven closures from scheduled roadworks.
-</p>
-
-<p align="justify">
-
-**Cause type and source:** The dominant cause type is roadMaintenance accounting for 160 of 296 records. Unplanned closures are uniformly attributed to roadOrCarriagewayOrLaneManagement, sourced exclusively from Signs and Signals.
-</p>
-
-![alt text](image-1.png)
-
-<p align="justify">
- This confirms that the two closure types are not only operationally distinct but are also sourced from different reporting systems within the DATEX II feed.
- </p>
-
-<p align="justify">
-
-**Temporal distribution:** Closure start times cluster strongly between 18:00 and 21:00 UTC consistent with overnight planned maintenance windows on the SRN.
-</p>
-
-![alt text](image-4.png)
-
-<p align="justify">
-Unplanned closures show a flatter distribution across the day, as expected for incident-driven events. The number of concurrently active closures at any given hour across the observation window peaks at 110 - 115 closures around 00:00 - 12:00 UTC.
-</p>
-
-![alt text](image-2.png)
-
-<p align="justify">
-
-**Duration:** Closure duration ranges from 0.25 to 17,544 hours, with a median of 9 hours and a mean considerably higher due to a small number of long-running planned closures extending  730+ days. Planned closures tend to follow overnight windows of approximately 8-12 hours, while unplanned closures are shorter and more variable.
-</p>
-
-<p align="justify">
-
-**Spatial distribution:** Closures span latitudes from  50.2359° to 55.0664°, with geographic concentration along -5.2584° to 1.7230° e.g. motorway and major A-road corridors in England. The roads most frequently appearing in the dataset are:
-</p>
-
-![alt text](image-5.png)
-
-No closures are missing spatial coordinates, confirming all records are eligible for the haversine station-matching step.
-
-<p align="justify">
-
-**Lanes closed:** The lanes closed field ranges from 0 to4, with a median of 1. A total of 107 records carry zero lanes closed, indicating full-road or carriageway-level closures rather than partial lane restrictions. This field will serve as a proxy for disruption severity in the feature set.
-</p>
-
----
-<p align="justify">
-
-> **Key findings - 3b: Road closures**
-> - 296 closure records over 72 hours, 200 planned and 96 unplanned
-> - 0% missing on all critical fields - dataset is complete and ready for spatial join without cleaning
-> - Planned and unplanned closures are structurally distinct in both cause type and validity status
-> - Planned closures concentrate in overnight windows; unplanned closures are distributed across the day
-> - Median duration: 9 hours, distribution is right-skewed by a small number of long-running works
-> - Spatial coverage: 50.24°-55.07°N and -5.26°- 1.72°E with no missing coordinates
-
-</p>
-
+![Alt text](notebooks\figures\eda_03\temporal_movements.png)
+ 
+**Key findings:**
+- 39,091 clean rows after dropping 1,858 records missing both timestamps
+- 38.2 percent of records classified as delayed (variation_status = LATE)
+- Delay distribution: mean 2.53 min, median 1 min, std 7.21 min, max 293 min; skewness 12.31 and kurtosis 255.70 confirm a heavily right-tailed distribution
+- Station code match rate 72.7 percent; unmatched records carry STANOX codes for junctions, sidings and non-passenger locations
+- Top stations by movement count: Clapham Junction (221), London Bridge (133), Vauxhall (114)
+ 
 ---
 
-## Section 4: Exploratory Data Analysis - Train Movements (EDA 03 + EDA 04)
-<p align="justify">
-This section examines the two rail-side data sources independently before any join with road closures. EDA 03 covers the Network Rail TRUST train moments feed - real-time observations of trains at locations with actual timestamps. EDA 04 covers the Darwin timetable - the planned service schedule for the same period. Together they form the two sides of the delay calculation: what was scheduled versus what was observed.
-</p>
+### 5.4 Darwin Timetable (EDA 04)
+ 
+**Source:** Rail Delivery Group Darwin push port; 2 XML files from `darwin-timetable-feeds`
 
-### 4.1 Train Moments (EDA 03)
-<p align="justify">
-Train moment files for the observation window were retrieved from the <code>train-moments</code> Azure Blob container via <code>data_loader.load_train_moment_files()</code>, covering 360 files. After parsing via <code>parse_train_moments()</code> and mapping STANOX codes to station TLC codes using the stations reference, the raw dataset contains 41026 rows across 32 columns.
-</p>
+**Output:** `darwin_timetable_clean.parquet` with 190,410 rows x 14 columns
+ 
+| Field | Type | Example | Notes |
+|---|---|---|---|
+| `rid` | string | `202604108062281` | Primary Key, Route identifier |
+| `trainId` | string | `2S69` | Headcode |
+| `ssd` | date | `2026-04-10` | Service date |
+| `toc` | string | `SW` | 39 distinct operators |
+| `tpl` | string | `WATRLMN` | TIPLOC stop code, resolved to TLC via CORPUS |
+| `act` | string | `TB` | Activity code, TB = begin, TF = finish, T = stop |
+| `wta` | time | `21:22` | Working time arrival, 53.5 percent non-null |
+| `wtd` | time | `21:22` | Working time departure, 53.5 percent non-null |
+| `wtp` | time | `21:23:30` | Working time pass, 40.0 percent non-null |
+| `pta` | time | `21:22` | Public time arrival, 50.5 percent non-null |
+| `stop_type` | string | `IP` | IP 45.6 percent, PP 40.0 percent, OR/DT 5.0 percent each |
 
-<p align="justify">
-
-**Completeness:** The two most operationally critical fields are <code>actual_timestamp</code> and <code>planned_timestamp</code>, as their difference forms the delay target variable. <code>actual_timestamp</code> is missing in 1,935 rows (4.7%); <code>planned_timestamp</code> in 2,377 rows (5.8%). Both timestamps are simultaneously missing in 1,935 rows, which are dropped prior to analysis. The cleaned dataset retains 39,091 rows. Other notable missing rates: <code>platform</code> (38.92%), <code>gbtt_timestamp</code> (36.47%) and <code>station_code</code> (27.42%), the latter reflecting STANOX codes that do not resolve to a known station TLC via the CORPUS crosswalk.
-</p>
-
-![alt text](image-6.png)
-
-<p align="justify">
-
-**Event type and variation status:** Train moments record two event types: DEPARTURE (23,552 records, 57.4%) and ARRIVAL (15,539 records, 37.9%). Variation status breaks down as: LATE (15,638), ON TIME (13,180), EARLY (9,831) and OFF ROUTE (442). The binary <code>is_delayed</code> flag, derived from variation status at ingestion, marks 38.1% of all cleaned records as delayed.
-</p>
-
-<p align="justify">
-
-**Raw delay distribution:** The <code>timetable_variation</code> field records delay magnitude in minutes as reported by the feed, independent of road closure conditioning. The distribution is strongly right-skewed: median 1 minutes, mean 2.53 minutes, with the 95th percentile at 10 minutes and a maximum of 293 minutes. The skewness and kurtosis values (12.31 and 255.7 respectively) confirm a heavy-tailed distribution typical of rail delay data, where the vast majority of services run close to schedule but a small number of severe delays pull the mean considerably above the median.
-</p>
-
-![alt text](image-8.png)
-
-<p align="justify">
-
-**Temporal distribution:** Train movements are concentrated between 10:00–14:00 and 19:00–22:00, consistent with morning and evening commute patterns. The day‑level breakdown shows substantial variation across the observation window: 2026‑04‑10 carries the highest volume with 23,562 movements, followed by 2026‑04‑12 with 10,658 and 2026‑04‑11 with 4,804. Night-hour movements are present but sparse.
-</p>
-
-![alt text](image-7.png)
-
-<p align="justify">
-
-**Station code coverage:** Of 41,026 total train moment records, 29,778 (72.6%) successfully map to a station TLC code via the STANOX → 3ALPHA lookup. The remaining 11,248 (27.4%) records carry STANOX codes not present in the CORPUS extract, most likely representing junctions, sidings or non-passenger locations. These unmatched records are excluded from the spatial join but retained in the cleaned parquet for completeness.
-</p>
-
-![alt text](image-9.png)
-
-<p align="justify">
-
-**Operational flags:** Three binary flags provide additional operational context. <code>delay_monitoring_point</code> is True for 45.9% of records, indicating official timing points used in punctuality measurement. <code>train_terminated</code> is True for 4.0% of records. The <code>data_source</code> field reveals that 88.4% of movements originate from SMART (the primary train describer feed), with the remainder from GPS, TSIA and other supplementary sources.
-</p>
-
-![alt text](image-10.png)
-
----
-<p align="justify">
-
-> **Key findings - 4.1: Train moments**
-> - 41,026 raw rows, 39.091 retained after dropping records missing both timestamps
-> - 38.1% of records classified as delayed (variation_status = LATE)
-> - Raw delay distribution is heavily right-skewed: median 1 min, mean range from 2.53 to 293 mins
-> - Station code match rate: 72.6%, unmatched records are non-passenger locations
-> - SMART is the dominant data source (88.4% of records), GPS and TSIA supplement coverage
-> - 45.9% of records flagged as official delay monitoring points
-
-</p>
-
+![Alt text](notebooks\figures\eda_04\service_frequency_by_hour.png)
+ 
+**Key findings:**
+- 190,410 stop rows 121,121 unique journeys across 39 TOCs
+- Largest TOCs by journey count: ScotRail (13,480), Northern Trains (12,332), South Western Railway (9,586), Great Western Railway (9,531)
+- Working times (wta / wtd) present for 53.5 percent of rows, wtp for 40.0 percent, missing values reflect pass-point stops with no arrival or departure record
+- 61.4 percent of rows carry a matched TIPLOC and are spatially eligible for the haversine join, remainder are junctions, depots and non-station locations
+- Median journey length 14 stops, range 2 to 150, peak service density 16:00 to 18:00 UTC
 ---
 
-### 4.2 Darwin Timetable (EDA 04)
-
-<p align="justify">
-Darwin timetable XML files for the observation window were parsed from the <code>darwin-timetable-feeds</code> container via <code>data_loader.load_darwin_timetable()</code>, producing 121,733 journey records across 2 files. After flattening to one row per stop, the raw timetable dataset contains 1,898,719 rows across 14 columns, saved as <code>data/processed/darwin_timetable_clean.parquet</code>.
-</p>
-
-<p align="justify">
-<b>Scale and structure:</b> The timetable is substantially larger than the train moments dataset, covering 121,121 unique journeys operated by 39 train operating companies. The largest TOCs by journey count are:
-</p>
-
-![alt text](image-11.png)
-
-<p align="justify">
-Stop types break down as: intermediate stops (<code>IP</code>, 45.6%), pass points (<code>PP</code>, 40%), destinations (<code>DT</code>, 5%) and origins (<code>OR</code>, 5%), with a small proportion of optional variants.
-</p>
-
-![alt text](image-12.png)
-
-<p align="justify">
-<b>Service date coverage:</b> Timetable records span 6 service dates within the observation window, with the largest single-day volume on 2026‑04‑10 (542,722 stop rows, 32,930 unique journeys). The coverage deliberately extends slightly beyond the road closure observation window to support forward prediction at window boundaries.
-</p>
-
-<p align="justify">
-<b>Planned time field coverage:</b> The timetable distinguishes between working times (<code>wta</code>, <code>wtd</code>, <code>wtp</code>) used for operational planning and public times (<code>pta</code>, <code>ptd</code>) shown to passengers. Working time fields are present for 53.55% of records (<code>wta</code>) and 53.55% (<code>wtd</code>), pass-point working times (<code>wtp</code>) are present for 40%. Public times are present for approximately ≈ 50% of records. The high proportion of missing public times reflects pass-point stops, which have no public timetable entry. The <code>features.py</code> module applies a priority hierarchy to select the most appropriate time field per <code>act</code> codes, ensuring a planned timestamp is available for the maximum number of records.
-</p>
-
-![alt text](image-13.png)
-
-<p align="justify">
-<b>Service frequency by hour:</b> Scheduled stops peak between 08:00 and 18:00, with the highest volumes around 16:00–18:00. This pattern is consistent with the train moments temporal distribution, providing reassurance that the timetable and movement feeds cover the same operational period.
-</p>
-
-![alt text](image-14.png)
-
-<p align="justify">
-<b>Journey-level statistics:</b> The 121,121 unique journeys contain a median of 14 stops each, ranging from 2 to 150. The 33,737 journeys have five or fewer stops, representing short shuttle or freight services, while 55,029 journeys have more than fifteen stops, corresponding to long-distance intercity services.
-</p>
-
-![alt text](image-15.png)
-
-<p align="justify">
-<b>TIPLOC match rate:</b> The timetable contains 5,003 unique TIPLOC codes. Matching these against the stations reference confirms that 2,583 (51.6%) resolve to a known station with coordinates. The remaining 2,420 TIPLOCs represent junctions, depots and non-station locations that carry no lat/lon and are therefore ineligible for the spatial join. At the row level, 1,166,537 of stop rows carry a matched TIPLOC, meaning 61.4% of the timetable is eligible to participate in the haversine join.
-</p>
-
----
-
-> <b>Key findings - 4.2: Darwin timetable</b>  
-> - 1,898,719 stop rows across 121,121 unique journeys and 39 TOCs  
-> - Working time fields (<code>wta</code>/<code>wtd</code>) present for ≈53.5% of records; <code>wtp</code> for ≈40%  
-> - 5,003 unique TIPLOCs; 51.6% match to station coordinates, remainder are non-passenger locations  
-> - At row level, 61.4% of timetable stops are spatially eligible for the haversine join  
-> - Service frequency peaks between 08:00–18:00 hours, pattern consistent with train moments temporal distribution  
-> - Median journey length: 14 stops, range from 2 to 150
-
----
-
-## Section 5: Merged Analytical Dataset (EDA 05 + EDA 06)
-
-<p align="justify">
-This section documents the construction and analysis of the two merged datasets that form the foundation of the modelling pipeline. EDA 05 covers the road closure and train moments join - the retrospective dataset where both planned and actual timestamps are known and delay can be calculated directly. EDA 06 covers the road closure and Darwin timetable join - the forward-looking prediction dataset where only planned timestamps are available and the model must generate delay forecasts before outcomes are observed.
-</p>
-
-### 5.1 Spatial Join - Closure to Station Matching
-
-<p align="justify">
-Both datasets are constructed using the same spatial join logic implemented in <code>geo.find_nearby_stations()</code>. For each road closure, a vectorised haversine distance is computed between the closure centroid and every station in the reference dataset. Stations falling within a 10-25 km band are retained as candidate impact locations, producing one row per closure-station pair. The lower bound of 10 km excludes stations immediately adjacent to the closure, where the causal mechanism is direct physical obstruction rather than modal shift and the upper bound of 25 km reflects the project's hypothesis that cross-modal effects attenuate beyond this range.
-</p>
-
-<p align="justify">
-Applied to the 296 road closures in the cleaned dataset, the spatial join produces 16,361 closure-station pairs across 2,594 unique stations. The mean distance between a closure and its matched stations is 19 km, with distances uniformly distributed across the 10-25 km band by design.
-</p>
-
-### 5.2 Temporal Filter
-
-<p align="justify">
-Following the spatial join, a 60-minute temporal filter (<code>features.filter_within_time_window()</code>) retains only those station service events whose planned timestamp falls within the 0-60 minute window after the closure start time. This window reflects the project's core hypothesis: that road-to-rail modal shift effects manifest within one hour of a closure opening. Events outside this window either preceding the closure or more than 60 minutes after it are excluded from both datasets.
-</p>
-
-<p align="justify">
-The filter is applied uniformly across all 10-minute sub-buckets within the window. Distribution of records across sub-buckets is approximately uniform in both datasets (approximately 16 - 18 % per 10-minute bucket), confirming that the temporal filter does not introduce a systematic bias toward any particular phase of the closure window.
-</p>
-
-### 5.3 Road Closures + Train Moments Dataset (EDA 05)
-
-<p align="justify">
-The retrospective analytical dataset is produced by merging the spatially expanded road closure table with the cleaned train moments dataset on station code and date, then applying the 60-minute temporal filter.
-</p>
-
-<p align="justify">
-<b>Dataset shape:</b> After the spatial join (16,361 closure-station pairs), station-level merge and temporal filter, the final analytical dataset contains 5,446 rows representing 126 unique closure events across 854 unique stations. This is the dataset the model trains on.
-</p>
-
-<p align="justify">
-<b>Target variable - delay:</b> Delay is computed as (<code>actual_timestamp − planned_timestamp</code>) in minutes. The distribution is centred close to zero (median 0 minutes, mean 1 minutes) but exhibits considerable spread (standard deviation 5.66 minutes) and heavy tails in both directions. Extreme early arrivals (below 30 minutes) account for 0.26 % of records, extreme late arrivals (above 30 minutes) account for 0.22 %. The most delayed individual record in the dataset shows a delay of 52.5minutes at Shortlands station, associated with a planned closure.
-</p>
-
-<p align="justify">
-The distribution's negative skewness (-2.9236) and high kurtosis (85.8512) reflect a pattern common in rail delay data: most services run close to schedule or slightly early, with a long right tail of significant delays. This motivates framing the prediction task as classification (delayed vs not delayed) rather than regression, as the continuous delay value is dominated by noise at low magnitudes.
-</p>
-
-<p align="justify">
-<b>Predictor distributions:</b> The two primary continuous predictors are <code>distance_in_km</code> (haversine distance from closure to station, range 10-25 km by construction) and <code>planned_time_diff</code> (minutes elapsed since closure start, range 0-60 by construction). Both are approximately uniformly distributed within their bounds. A derived interaction term <code>distance_time_interaction</code> (distance × time) is also available for modelling.
-</p>
-
-![alt text](image-18.png)
-
-<p align="justify">
-<b>Delay by categorical variables:</b> Mean delay differs between closure types: planned closures are associated with a mean delay of 1.59 minutes versus  0.52 minutes for unplanned closures. This is not causally interpretable  planned closures occur predominantly overnight when rail service frequency is lower, confounding the comparison. 
-Delay is broadly similar across event types (ARRIVAL: mean 0.97 min , DEPARTURE: mean 1.03 min).
-</p>
-
-![alt text](image-20.png)
-
-<p align="justify">
-<b>Bivariate relationships:</b> Pearson correlation between <code>distance_in_km</code> and delay is –0.020 and between <code>planned_time_diff</code> and delay is 0.019, both close to zero. This weak linear signal is consistent with the expectation that road-to-rail disruption effects are mediated by complex routing and modal shift behaviour rather than a simple linear distance-decay function. The mean delay heatmap across distance × time bins shows no discernible spatial pattern.
-</p>
-
-![alt text](image-19.png)
-
-<p align="justify">
-<b>Temporal patterns:</b> Mean delay by hour of day shows 
-- Negative delays in early morning hours
-- Positive delays around midday and early afternoon. 
-</p>
-
-![alt text](image-21.png)
-
-<p align="justify">
-This temporal signal may partially reflect underlying rail congestion patterns rather than road closure effects and is noted as a potential confound in the modelling phase.
-</p>
-
-<p align="justify">
-<b>Spatial patterns:</b> The 854 stations represented in the dataset contribute unequally: the top 15 stations by record count account for 13.2% of all rows. The most frequently appearing stations are located near high-closure-density road corridors.
-</p>
-
-![alt text](image-22.png)
-
-<p align="justify">
-Individual closure impact varies widely: the median closure affects 13.5 station-service pairs within the window, while the highest-impact closure affects 334 pairs.
-</p>
-
----
-
-> <b>Key findings - 5.1: Road + train moments dataset</b>  
-> - 5,446 rows after spatial join and 60-minute temporal filter, 126 closures, 854 stations  
-> - Delay distribution: median 0 min, mean 1 min, std 5.66 min - right-skewed with heavy tails  
-> - Weak linear correlation between spatial/temporal predictors and delay, non-linear modelling approach warranted  
-> - Planned closures associated with marginally higher mean delay than unplanned, confounded by time-of-day  
-> - Uniform distribution across 10-minute time buckets confirms no temporal filter bias  
-> - 26 extreme delay records (14 early, 12 late) retained but flagged for sensitivity analysis  
-
----
-
-### 5.4 Road Closures + Timetable Dataset (EDA 06)
-
-<p align="justify">
-The forward-looking prediction dataset mirrors the retrospective pipeline but substitutes the Darwin timetable for train moments. Because the timetable contains only planned timestamps - no actual observations - there is no delay column in this dataset. Its purpose is to identify which scheduled services fall within the spatial and temporal impact zone of each closure, so the trained model can generate delay forecasts for services not yet operated.
-</p>
-
-<p align="justify">
-<b>Dataset shape:</b> After the spatial join, schedule merge on station and service date and 60-minute temporal filter, the timetable dataset contains 100,069  rows representing 190 unique closures across 1,467 unique stations. This is substantially larger than the retrospective dataset, reflecting the much greater volume of the timetable relative to the train moments sample.
-</p>
-
-<p align="justify">
-<b>Coverage comparison:</b> Comparing the two datasets reveals an important asymmetry. The timetable dataset is approximately 18.4× larger than the train moments dataset after identical filtering. Station overlap between the two datasets is  846 stations in common, with 621 stations appearing only in the timetable dataset and 8 appearing only in the train moments dataset. All closures represented in the train moments dataset are also present in the timetable dataset, but 64 additional closures appear only in the timetabl, these are events for which no train moment records were captured during the observation window, likely due to sparse service frequency at affected stations.
-</p>
-
-<p align="justify">
-This asymmetry has a direct implication for the modelling strategy: the model is trained on 5,446 labelled rows from the retrospective dataset but generates predictions for 100,069 rows in the forward-looking dataset. The prediction set is substantially larger and covers a wider set of stations and closures than the training set, which represents a meaningful generalisation challenge.
-</p>
-
-<p align="justify">
-<b>Predictor distributions:</b> As in the retrospective dataset, <code>distance_in_km</code> and <code>planned_time_diff</code> are approximately uniformly distributed by construction. The interaction term and categorical features (closure type, cause type, event type, validity status) carry the same distributions as the retrospective dataset, confirming the two datasets are structurally compatible for prediction.
-</p>
-
-![alt text](image-16.png)
-
-<p align="justify">
-<b>Event type composition:</b> The timetable dataset contains a higher proportion of ARRIVAL and PASS events relative to DEPARTURE events compared to the retrospective dataset. This reflects the fact that pass-point stops (<code>PP</code>) appear in the timetable but generate no train moment records, as they are not reporting points in the TRUST feed.
-</p>
-
-<p align="justify">
-<b>Closure type x Event type:</b>
-</p>
-
-| closure / event | ARRIVAL| DEPARTURE | PASS | Total |
-|-----------------|--------|-----------|------|-------|
-| planned         | 200    |2961       | 6604 | 43223 |
-| unplanned       | 41939  |3524       | 11383| 56846 |
-| Total           | 75597  |6485       | 17987| 100069|
-
-![alt text](image-17.png)
-
-<p align="justify">
-<b>Scheduled service density by hour:</b> Scheduled services within the closure window peak  between 18:00 and 22:00, with the largest concentration of records at 21:00. This hour-level density is driven by the interaction of closure timing (predominantly overnight for planned, daytime for unplanned) and rail service frequency and confirms that the temporal filter captures a representative cross-section of scheduled operations.
-</p>
-
-<p align="justify">
-<b>Closure impact on timetable:</b> Individual closure impact on timetable services varies widely: the median closure affects 186.5 scheduled services within the 60-minute window, while the highest-impact closure affects 4,486 services. This range reflects differences in both the geographic density of rail services near the closure and the duration of the closure relative to the observation window.
-</p>
-
----
-
-> <b>Key findings - 5.2: Road + timetable dataset</b>  
-> - 100,069 rows after spatial join and temporal filter, 190 closures, 1,467 stations  
-> - Timetable dataset is  ≈18.4× larger than retrospective dataset after identical filtering  
-> - 621 stations and 64 closures present only in timetable - model must generalise beyond training distribution  
-> - No delay column, this is the predictiononly dataset, model outputs are delay probability forecasts  
-> - Pass-point stops inflate timetable row count relative to train moments, event type composition differs  
-> - Median closure impact: 186.5 scheduled services; max: 4,486  
-
----
-
-# Section 6: Modelling & Prediction Pipeline - Outline
-
----
-
-## 6.1 Problem Framing
-
-<p align="justify">
-<ul align="justify">
-  <li>Why classification rather than regression
-  <li>Delay distribution is heavily right-skewed with median = 0, predicting exact minutes is dominated by noise at low magnitudes</li>
-  <li>Motivates F1 / ROC-AUC as primary evaluation metrics rather than RMSE</li>
-  </li>
-</ul>
-</p>
-
----
-
-## 6.2 Feature Engineering
-
-<p align="justify">
-Features drawn from the merged retrospective dataset (EDA 05). Grouped by type:
-</p>
-
-<ul align="justify">
-  <li><b>Spatial</b>
-    <ul>
-      <li><code>distance_in_km</code> - haversine distance from closure centroid to station (10–25 km by construction)</li>
-      <li><code>distance_time_interaction</code> - distance × planned_time_diff (derived interaction term)</li>
-    </ul>
-  </li>
-</ul>
-
-<ul align="justify">
-  <li><b>Temporal</b>
-    <ul>
-      <li><code>planned_time_diff</code> - minutes elapsed between closure start and scheduled service (0–60 by construction)</li>
-      <li><code>start_hour</code> - hour of day of closure start (captures overnight vs daytime maintenance patterns)</li>
-      <li><code>start_dow</code> - day of week of closure start (weekday vs weekend service frequency differs)</li>
-    </ul>
-  </li>
-
-  <li><b>Closure metadata</b>
-    <ul>
-      <li><code>closure_type</code> - planned / unplanned (binary, one-hot encoded)</li>
-      <li><code>cause_type</code> - roadMaintenance, accident, etc. (categorical, one-hot encoded)</li>
-      <li><code>validity_status</code> - active / suspended / planned (categorical, one-hot encoded)</li>
-    </ul>
-  </li>
-
-  <li><b>Rail service metadata</b>
-    <ul>
-      <li><code>event_type</code> - ARRIVAL / DEPARTURE / PASS (categorical, one-hot encoded)</li>
-    </ul>
-  </li>
-
-  <li><b>Not included and why</b>
-    <ul>
-      <li><code>poslist</code> / raw geometry - too high-dimensional for this proof-of-concept scope</li>
-      <li><code>road_name</code> - high cardinality; would require embedding or hashing not justified at this stage</li>
-      <li>Footfall - available per station but not time-varying within the window, low marginal value</li>
-    </ul>
-  </li>
-</ul>
-
----
-
-## 6.3 Model Selection
-
-<p align="justify">
-Three candidate models evaluated:
-</p>
-
-| Model | Rationale |
+### 5.5 Merged Analytical Datasets (EDA 05 and EDA 06)
+ 
+**Source:** Spatial join (haversine 10 to 25 km) applied to road closures against all stations, followed by 60-minute temporal filter
+
+**Outputs:** Two parquet files  one retrospective (labelled), one forward-looking (unlabelled)
+ 
+| Dataset | Rows | Closures | Stations | Delay column | Purpose |
+|---|---|---|---|---|---|
+| Retrospective (EDA 05) | 93,749 | 184 | 1,373 | Yes, actual minus planned | Model training |
+| Prediction (EDA 06) | 269,497 | 243 | 1,566 | No, planned only | Forward scoring |
+ 
+**Retrospective dataset - delay target variable:**
+ 
+| Statistic | Value |
 |---|---|
-| Logistic Regression | Interpretable baseline, establishes whether linear decision boundary is sufficient |
-| Random Forest | Handles non-linear relationships and feature interactions; robust to class imbalance with class_weight='balanced' |
-| XGBoost | Gradient boosting; strongest expected performance on tabular data; native handling of missing values |
+| Mean | 1.095 min |
+| Median | 0.0 min |
+| Std deviation | 5.382 min |
+| Min | -169 min |
+| Max | +215 min |
+| Skewness | 1.085 |
+| Kurtosis | 156.59 |
+ 
+**Pearson correlation - predictors vs delay:**
+ 
+| Feature | r |
+|---|---|
+| `distance_in_km` | -0.018 |
+| `planned_time_diff` | -0.002 |
+| `distance_time_interaction` | -0.003 |
+ 
+<p align="justify">
+All correlations are effectively zero. This is the single most consequential EDA finding: the available spatial and temporal features carry no linear signal relative to the delay target. It does not mean no relationship exists. It means the relationship, if present, is not detectable through linear association at this sample size and observation window.
+</p>
+
+![Alt text](notebooks\figures\eda_05\predictor_distributions.png)
+
+**Key findings:**
+- Retrospective: 93,749 rows, 184 closures, 1,373 stations, delay label computed from actual minus planned timestamp
+- Prediction: 269,497 rows, 243 closures, 1,566 stations, 2.9 times larger than retrospective dataset
+- 59 closures and 204 stations appear only in the prediction set the model must generalise to unseen combinations
+- Pearson r between all predictors and delay is effectively zero, no linear signal detected
+- 60-minute window records are uniformly distributed across 10-minute sub-buckets no temporal filter bias
+
+---
+
+# 6: Modelling & Prediction Pipeline
 
 <p align="justify">
-All three trained on the same feature set to enable direct comparison. Final model selected on validation F1 score.
+The retrospective dataset (93,749 labelled rows) is the training input. The target variable is <code>delay</code> in minutes, computed as <code>actual_timestamp minus planned_timestamp</code>. Regression was chosen over binary classification because the delay target carries meaningful signed information: a train running 10 minutes early is operationally different from one running 10 minutes late, and collapsing both into a single delayed label discards that distinction. The 38.2 percent class imbalance is a real concern but is better addressed through sample weighting than target transformation.
+</p>
+<p align="justify">
+LSTM and other sequential architectures were considered and rejected on three grounds. The 72-hour observation window does not provide the volume of sequential labelled data these models require. The TRUST feed does not consistently carry a route identifier in real time, so constructing the stop sequences an LSTM would consume requires a Darwin timetable join that adds its own error. And interpretability is a requirement here: a prediction that cannot be decomposed into feature contributions is difficult to act on in a control room context.
 </p>
 
 ---
 
-## 6.4 Train / Test Split Strategy
+### 6.1 Feature Set and Data Architecture
+ 
+<p align="justify">
+Five features are used. Each has a causal rationale, not just a statistical association. No imputation is required all five fields are fully populated after the spatial-temporal filtering pipeline.
+</p>
 
-<ul align="justify">
-  <li>Temporal split preferred over random split, avoids data leakage across time</li>
-  <li>Train-Test split - 80/20 strategy</li>
-  <li>Class imbalance handled via <code>class_weight='balanced'</code> (sklearn) or <code>scale_pos_weight</code> (XGBoost)</li>
-  <li>No cross-validation given the small dataset size (5,446 rows), single temporal hold-out reported</li>
-</ul>
-
----
-
-## 6.5 Evaluation Metrics
-
-<ul align="justify">
-  <li><b>Primary metrics:</b>
-    <ul>
-      <li>Evaluation Metrics - MAE, RMSE, R2, MAPE will be evaluated on all models</li>
-      <li>ROC-AUC - threshold-independent measure of discriminative ability</li>
-      <li>F1 score - harmonic mean of precision and recall, appropriate given class imbalance</li>
-      <li>Precision / Recall - reported separately to characterise the cost of false positives vs false negatives in an operational context</li>
-    </ul>
-  </li>
-
-  <li><b>Secondary:</b>
-    <ul>
-      <li>Confusion matrix</li>
-      <li>Calibration plot - important for a probabilistic output used in an operational dashboard</li>
-    </ul>
-  </li>
-</ul>
-
----
-
-## 6.6 Explainability
-
-<ul align="justify">
-  <li>Feature importance (MDI) from Random Forest and XGBoost - which variables drive predictions most</li>
-  <li>SHAP summary plot if implemented - directional effect of each feature on predicted delay probability</li>
-  <li>Explainability is a stated requirement of the Kainos brief ("intentionally lightweight, explainable") - findings reported here directly address that objective</li>
-</ul>
-
----
-
-## 6.7 Forward Prediction on Timetable Dataset
-
-<ul align="justify">
-  <li>Trained model applied to the 100,069-row timetable dataset (EDA 06)</li>
-  <li>Output: delay probability score per scheduled service within the 60-minute closure window</li>
-  <li>Services ranked by predicted probability - highest-risk services surfaced first</li>
-  <li>Generalisation challenge noted: 621 stations and 64 closures in prediction set not seen during training</li>
-</ul>
-
----
-
-## 6.8 Limitations of the Modelling Approach
-
-<ul align="justify">
-  <li>Small training set (5,446 rows) limits model complexity and confidence in generalisation</li>
-  <li>72-hour observation window may not capture seasonal or weekday/weekend variation</li>
-  <li>Causal inference not established - the model identifies correlation between closure proximity and delay, not a verified mechanism</li>
-</ul>
-
-# Section 7: Critical Evaluation & Conclusions - Outline
-
----
-
-## 7.1 Limitations
-
-<p align="justify"><b>Data and scope</b></p>
-
-<ul>
-<li>72-hour observation window (10–12 April 2026) - single weekend window; no weekday, seasonal or regional variation captured</li>
-<li>Train moments dataset small post-filter (5,446 rows) - limits statistical power and generalisation confidence</li>
-<li>TIPLOC match rate in timetable: ~61.4% at unique code level, non-passenger locations (junctions, depots) cannot be spatially joined introduces coverage gap for some routes</li>
-<li>STANOX → TLC crosswalk via CORPUS: 1 unmatched station out of 2,595, negligible but noted</li>
-<li>Street Manager data collected but outside analytical window, emergency works not included in this proof-of-concept</li>
-<li>BODS (bus) data not integrated</li>
-</ul>
-
-<p align="justify"><b>Methodological</b></p>
-
-<ul>
-<li>Causal mechanism not established - model identifies spatial-temporal correlation between closures and delays, not a verified road-to-rail displacement pathway</li>
-<li>Binary delay target loses severity information - a 1-minute delay and a 30-minute delay are treated identically</li>
-<li>Temporal split with a 72-hour window provides a thin test set - generalisation estimates are indicative, not robust</li>
-<li>Haversine distance uses closure centroid, not full road geometry - long closures with complex polyline geometries may be misrepresented by a single centroid point</li>
-</ul>
-
----
-
-## 7.2 Answers to Research Questions
-
-<p align="justify"><b>RQ1: Do SRN/MRN closures measurably affect rail punctuality within 10–25 km?</b></p>
-
-<ul>
-<li>Empirical finding from EDA 05: mean delay of 1 min, median 0 min across 5,446 closure-adjacent service events</li>
-<li>Pearson correlation between distance/time proximity and delay: r ≈ 0.02 - weak linear signal</li>
-<li>modeling result - does the classifier perform above baseline? Does feature importance confirm any spatial or temporal signal?</li>
-<li>Honest assessment: the EDA alone does not confirm a strong causal signal; the model result will determine whether any predictive relationship exists</li>
-</ul>
-
-<p align="justify"><b>RQ2: Can road event metadata forecast rail delay within a 60-minute horizon?</b></p>
-
-<ul>
-<li>Evaluation metrics from best model</li>
-<li> which features carry most importance</li>
-<li>Binary framing pragmatic given distribution, future work should explore severity prediction</li>
-</ul>
-
-<p align="justify"><b>RQ3: What pipeline architecture supports real-time integration into a Transport Data Platform?</b></p>
-
-<ul>
-<li>Answered architecturally in Section 2: Kafka ingestion, Azure Blob Storage, Python src/ library, parquet intermediate outputs</li>
-<li>Forward prediction on 100,069 timetable rows demonstrated feasibility of scoring services before outcomes observed</li>
-<li>Latency of the current pipeline:  e.g. batch upload cadence, time from closure event to scored output</li>
-</ul>
-
----
-
-## 7.3 Commercial Applicability
-
-<ul>
-<li>The pipeline architecture (Kafka → Azure Blob → Python processing → scored output) is directly compatible with Kainos's Transport Data Platform patterns</li>
-<li>Scoring the timetable dataset produces a ranked list of at-risk services per closure event - actionable output for control room use without requiring domain expertise to interpret</li>
-<li>Explainable model (feature importance / SHAP) meets the stated requirement for interpretability in operational tools</li>
-<li>Street Manager integration (emergency works with minimal lead time) is the highest-priority near-term extension - data already collected, pipeline already exists</li>
-<li>A production version would require: longer training window, live Kafka scoring (rather than batch) and integration with a dashboard or alerting layer</li>
-</ul>
-
----
-
-## 7.4 Future Work
-
-<ul>
-<li><b>Longer observation window</b> - 4–12 weeks of data would substantially improve model robustness and allow weekday vs weekend stratification</li>
-<li><b>Street Manager integration</b> - emergency works data already ingested; including it would extend coverage to unplanned short-notice closures not captured in DATEX II</li>
-<li><b>Tri-modal extension (BODS)</b> - bus SIRI VM feeds would enable road–rail–bus disruption modelling; highest value in urban corridors with dense bus networks</li>
-<li><b>Regression / severity modelling</b> - once training data volume is sufficient, predicting delay magnitude would produce richer operational outputs</li>
-<li><b>Equity analysis</b> - GeoDS accessibility and smartcard data (identified as desirable in the Kainos brief) would enable assessment of which passenger groups are disproportionately affected by cross-modal disruption</li>
-<li><b>Live scoring pipeline</b> - replace batch Azure Blob processing with a real-time Kafka consumer scoring services as closure events arrive</li>
-</ul>
-
----
-
-## 7.5 Ethical Considerations
-
-<ul>
-<li>All data sources are open or licensed under publicly accessible terms (Rail Data Marketplace, National Highways open data); no personally identifiable information is processed at any stage</li>
-<li>The CORPUS, GB Stations and Darwin timetable datasets are used in accordance with their respective licence terms</li>
-<li>Model outputs are probabilistic scores, not deterministic labels - appropriate for operational support rather than automated decision-making</li>
-<li>Transparency: the model is intentionally lightweight and explainable, consistent with responsible AI principles for public sector deployment</li>
-</ul>
-
----
-
-## 7.6 Conclusion
+| Feature | Type | Rationale |
+|---|---|---|
+| `distance_in_km` | Continuous 10-25 km | Modal shift pressure decays with distance from closure |
+| `planned_time_diff` | Continuous 0-60 min | Demand redistribution takes time to manifest after closure opens |
+| `distance_time_interaction` | Continuous | Captures joint effect of proximity and elapsed window |
+| `closure_type` | Categorical | Unplanned closures have no advance notice; different demand response expected |
+| `event_type` | Categorical | Arriving trains accumulate passengers; departing trains clear them |
 
 <p align="justify">
-This project demonstrates that a lightweight, open-data pipeline can integrate road and rail data sources at national scale, construct a spatially and temporally filtered analytical dataset and produce a proof-of-concept delay prediction model within a single MSc project scope. The EDA establishes a clear data foundation: 5,446 labelled training rows, 100,069 forward-prediction rows and a reusable pipeline capable of reproducing both datasets for any future time window. While the short observation window and small training set limit the strength of conclusions that can be drawn, the pipeline architecture, feature set and modelling framework are directly extensible to a production-grade Transport Data Platform - which is the outcome of most direct commercial value.
+Four fields were explicitly excluded. <code>road_name</code> has high cardinality and would require embedding not justified at this scale. <code>lanes_closed</code> does not encode severity consistently. 155 records carry zero lanes closed, indicating full carriageway closure, which is more severe than a partial restriction with a higher lane count. <code>cause_type</code> is perfectly correlated with <code>closure_type</code> in this dataset and adds no independent information. Station footfall is available per station but is not time-varying within the observation window and carries marginal predictive value at this scale.
+</p>
+
+<p align="justify">
+The pipeline uses tabular parquet files throughout rather than graph or key-value structures. This was a deliberate choice. A graph structure with stations as nodes and shared route segments as edges would support journey-level propagation modelling, but that is out of scope here: station-level analysis does not require edge traversal. Key-value storage is already handled at the Azure Blob layer. Parquet was chosen over CSV for intermediate outputs because column pruning allows downstream notebooks to load only the fields they need from a 2.86M-row file, Snappy compression reduces storage footprint by approximately 70 percent, and schema enforcement catches type errors at write time rather than at analysis time.
+</p>
+
+---
+
+### ML Training Pipeline
+
+```mermaid
+flowchart TD
+    INPUT["road_train_movements_dataset.parquet
+    93,749 rows · 5 features · delay target"]
+
+    FE["Feature engineering
+    OHE: closure_type · event_type · numeric passthrough"]
+
+    SPLIT["Temporal train / test split
+    80% train 74,999 · 20% test 18,750"]
+
+    LR["Linear Regression
+    MAE 2.182"]
+    RF["Random Forest
+    MAE 2.541"]
+    GB["Gradient Boosting
+    MAE 2.204"]
+    XG["XGBoost
+    MAE 2.260"]
+
+    BEST["Best model - Linear Regression
+    MAE 2.182 · RMSE 4.381 · R² negative"]
+
+    PKL["Saved: models/road_rail_model.pkl"]
+
+    PRED["Forward prediction on timetable
+    269,497 rows scored
+    Station-level MAE 1.685 min
+    Match rate vs actual Movements 20.03%"]
+
+    NOTE["Finding: all models R² negative
+    Model predicts close to training mean
+    Feature set lacks individual-service signal"]
+
+    INPUT --> FE
+    FE --> SPLIT
+    SPLIT --> LR
+    SPLIT --> RF
+    SPLIT --> GB
+    SPLIT --> XG
+    LR --> BEST
+    RF --> BEST
+    GB --> BEST
+    XG --> BEST
+    BEST --> PKL
+    BEST --> PRED
+    PRED --> NOTE
+```
+
+---
+
+
+### 6.2 Training
+ 
+<p align="justify">
+Categorical features are one-hot encoded via a <code>ColumnTransformer</code>; numeric features pass through unchanged. Both the preprocessor and the model are wrapped in a single <code>sklearn.Pipeline</code> object. This is a software engineering decision as much as a statistical one: it enforces identical transformation on both the training set and the 2,863,334-row prediction dataset, eliminates the risk of data leakage from fit-transform being applied to the test set, and serialises the full pipeline into a single <code>road_rail_model.pkl</code> file that can be reapplied to any future timetable window without reimplementing the preprocessing steps.
+</p>
+<p align="justify">
+An 80/20 temporal split is used rather than random cross-validation. Random splitting would allow future observations to inform predictions about past events, which does not reflect the operational setting where the model scores services before their outcomes are known. The training set contains 74,999 rows (mean delay 1.206 min, std 5.604 min); the test set contains 18,750 rows (mean delay 0.651 min, std 4.352 min).
+</p>
+
+<p align="justify">
+Linear Regression solves for the coefficient vector <strong>w</strong> that minimises the sum of squared residuals via the normal equation: <code>w = (X^T X)^-1 X^T y</code>. This produces an exact solution in one matrix operation with no hyperparameters and no iterative convergence, which is why training completes in 0.08 seconds. For Gradient Boosting and XGBoost, the algorithm fits an ensemble of shallow trees sequentially, each tree learning the residuals of the previous ensemble. When residuals carry no learnable pattern as is the case here where predictor correlations are near zero each successive tree fits noise rather than signal, and the ensemble grows without improving. This is the direct explanation for why both methods underperform Linear Regression despite being computationally more expensive.
+</p>
+
+---
+
+### 6.3 Results
+ 
+| Model | MAE (min) | RMSE (min) | R2 | Training time |
+|---|---|---|---|---|
+| **Linear Regression** | **2.182** | **4.381** | -0.014 | 0.15s |
+| Gradient Boosting | 2.204 | 4.391 | -0.018 | 6.89s |
+| XGBoost tuned | 2.220 | 4.402 | -0.023 | 0.78s |
+| XGBoost | 2.260 | 4.439 | -0.041 | 0.61s |
+| Random Forest | 2.541 | 4.750 | -0.191 | 35.40s |
+
+<p align="justify">
+Linear Regression achieves the lowest MAE at 2.182 minutes and trains in 0.08 seconds. All five models produce negative R2, meaning none outperforms a naive mean predictor on the test set. The feature coefficients confirm why: <code>event_type_ARRIVAL</code> carries +0.055, <code>closure_type_planned</code> carries +0.054, <code>distance_in_km</code> carries -0.025, and <code>planned_time_diff</code> carries effectively zero. All coefficients are small. The model predicts close to the training mean for every input, which is precisely what near-zero predictor correlations would produce.
+</p>
+
+---
+
+### 6.4 Inference and Forward Prediction
+ 
+<p align="justify">
+The saved pipeline is applied to all 2,863,334 rows in the timetable prediction dataset, producing a <code>predicted_delay</code> column for every scheduled service within each closure's 60-minute window. The predicted distribution is narrow nearly all predictions fall between 1 and 2 minutes reflecting the model predicting near the training mean throughout. A <code>merge_asof</code> join with a 20-minute tolerance by station matches 573,517 timetable rows (20.03 percent) to an actual train moment record, yielding a station-level aggregated MAE of 1.685 minutes against observed delay. This is lower than the row-level test MAE of 2.182 minutes because station-level averaging cancels individual prediction errors.
+</p>
+
+<p align="justify">
+The negative R2 is the headline result. Three explanations are plausible and not mutually exclusive. Road closures may produce a real but small effect on rail delay that is undetectable against a standard deviation of 5.38 minutes at this sample size. The haversine centroid is a coarse spatial proxy long closures spanning 20 kilometres or more are misrepresented by a single point. And a single weekend window understates the weekday peak-hour modal shift pressure that motivates the project. The null result does not mean the relationship does not exist. It quantifies what is needed to detect it: more data, finer spatial resolution and features that encode traffic volume rather than closure metadata alone.
+</p>
+
+![Alt text](notebooks\figures\model\predicted_delay_distribution.png)
+
+---
+
+## 7: Critical Evaluation and Conclusions
+ 
+### 7.1 Limitations
+ 
+<p align="justify">
+The most significant constraint on this study is its temporal scope. A 72-hour observation window covering a single weekend provides insufficient training volume to detect a weak cross-modal effect against the natural variance in rail delay. Weekend service patterns feature lower frequency and fewer commuters than weekday peak hours, which are precisely the conditions under which road-to-rail modal shift pressure is greatest. Any finding from this window, positive or negative, cannot be reliably generalised to the full operational context the project is designed to address.
+</p>
+
+<p align="justify">
+The spatial join uses haversine distance from a closure centroid to station coordinates. For short closures this is an adequate approximation. For long closures spanning multiple kilometres, a single centroid point may fall far from the section of road that is closest to the affected rail station. Some closure-station pairs that should be in the join may be excluded, and some that should not may be included. Polygon-based catchment areas derived from the full DATEX II polyline geometry would resolve this but require a more complex spatial processing step than the current pipeline implements.
+</p>
+<p align="justify">
+Two data sources identified in the project scope were not integrated in this proof of concept. Street Manager emergency works data was collected and is available in the pipeline, but the observation window predates the records collected. Bus open data (BODS) was scoped as a desirable extension but was not implemented. The current model therefore captures road closures on the SRN only and does not reflect the full spectrum of road network disruption that would affect passenger behaviour.
+</p>
+
+<p align="justify">
+The TIPLOC match rate of 61.4 percent at row level in the Darwin timetable means that approximately 38.6 percent of scheduled stop rows are ineligible for the spatial join. These are predominantly pass-point stops at junctions and depots. They do not represent a bias in the dataset but they reduce the volume of forward prediction rows that can be meaningfully scored.
+</p>
+
+---
+
+### 7.2 Research Question Answers
+ 
+<p align="justify">
+<strong>RQ1: Do SRN road closures produce measurable delay at rail stations within 10 to 25 km?</strong> The EDA finds a Pearson correlation of r = 0.018 between spatial proximity and delay across 93,749 closure-adjacent service events. Mean delay in the retrospective dataset is 1.095 minutes with a median of zero. The modelling result confirms the EDA finding: all five candidate models produce negative R2, meaning the feature set cannot distinguish closure-adjacent delay from background rail delay. On the evidence available from this window and this spatial band, no measurable effect is confirmed. This is an honest null result, not a methodological failure.
+</p>
+<p align="justify">
+<strong>RQ2: Can road event metadata forecast rail delay within a 60-minute horizon?</strong> With the current feature set and observation window, the answer is no at the individual service level. The best model achieves MAE 2.182 minutes on the test set with R2 of negative 0.014. Station-level aggregated MAE of 1.685 minutes against actual moments suggests some averaging benefit, but this does not constitute a predictive signal. The feature set needs AADF traffic volume, finer spatial resolution and a longer training window before this question can be answered conclusively.
+</p>
+
+<p align="justify">
+<strong>RQ3: What pipeline architecture supports reproducible analysis and integration into an operational transport platform?</strong> The four-layer pipeline documented in Section 4 and Section 6 demonstrates end-to-end feasibility: road closure data ingested via REST, train moments streamed from Kafka, timetable data parsed from XML, all cached in Azure Blob Storage, processed through a decoupled Python library, and scored via a serialised pipeline object. The architecture is reproducible across any future time window without modification. Moving from batch to event-driven inference requires a scheduler wrapper around existing processing logic rather than changes to the pipeline itself.
+</p>
+
+---
+ 
+### 7.3 Future Work
+ 
+<p align="justify">
+Five extensions are identified in order of expected impact on model performance.
+</p>
+
+| Priority | Extension | Expected impact |
+|---|---|---|
+| 1 | Extend observation window to 4 to 12 weeks covering weekday peaks | Directly addresses the data volume constraint that produces the null result |
+| 2 | Add AADF traffic volume as a feature | Distinguishes a motorway closure displacing 80,000 vehicles from a minor A-road closure with the same DATEX II record structure |
+| 3 | Replace centroid haversine with polygon catchment areas from DATEX II polylines | Corrects spatial misrepresentation of long closures spanning multiple rail catchments |
+| 4 | Integrate Street Manager emergency works data | Adds the closure category with shortest lead time and highest early warning value; data already ingested |
+| 5 | Journey-level modelling via rid chaining in Darwin timetable | Surfaces specific services at risk rather than aggregating to station level |
+
+---
+ 
+### 7.4 Conclusion
+ 
+<p align="justify">
+This project demonstrates that a lightweight open-data pipeline can integrate road and rail data sources at national scale, construct a spatially and temporally filtered analytical dataset, and produce a proof-of-concept prediction model within a single MSc project scope. The EDA establishes a clear data foundation: 93,749 labelled training rows, 2,863,334 forward-prediction rows, and a pipeline capable of reproducing both datasets for any future time window without modification.
+</p>
+<p align="justify">
+The modelling result is a quantified null finding. The Pearson r of negative 0.018 and R2 of negative 0.014 set a documented baseline. They do not establish that road closures have no effect on rail punctuality. They establish that detecting such an effect, if it exists, requires more data, finer spatial resolution and features that encode the volume of traffic displaced rather than the administrative metadata of the closure event. The pipeline and feature set are in place to run that experiment. The next step is data.
 </p>
 
 ---
