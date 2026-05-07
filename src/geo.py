@@ -52,24 +52,23 @@ def find_nearby_stations(road_df, stations_df, min_km=10, max_km=25):
             tlc = st["tlc"]
             rows.append({
                 "closure_id": row.get("situation_id"),
-                "closure_lat": lat,
-                "closure_lon": lon,
                 "closure_type": row["closure_type"],
                 "closure_start_time": pd.to_datetime(row["start_time"]).tz_localize(None),
                 "closure_end_time": pd.to_datetime(row["end_time"]).tz_localize(None),
                 "start_hour": row["start_hour"],
                 "start_dow": row["start_dow"],
                 "start_date": row["start_date"],
+                "duration_hours": row["duration_hours"],
+                "effective_duration_hours": row["effective_duration_hours"],
+                "effective_end_time": pd.to_datetime(row["effective_end_time"]).tz_localize(None),
+                "effective_start_time": pd.to_datetime(row["effective_start_time"]).tz_localize(None),
                 "validity_status": row["validity_status"],
                 "cause_type": row["cause_type"],
                 "station_name": st["station"],
-                "station_lat": st["latitude"],
-                "station_lon": st["longitude"],
                 "station_code": tlc,
                 "stanox": tlc_to_stanox.get(tlc),
                 "tpl": tlc_to_tiploc.get(tlc),
-                "distance_in_km": st["distance_km"],
-                "road_ingestion_time": pd.to_datetime(row["ingestion_time"]).tz_localize(None),
+                "distance_in_km": st["distance_km"]
             })
 
     return pd.DataFrame(rows)

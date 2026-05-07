@@ -153,9 +153,7 @@ def parse_train_moments(train_files, stations_df):
 
             for col in ("actual_timestamp", "planned_timestamp", "gbtt_timestamp"):
                 if col in df.columns:
-                    df[col] = df[col].apply(
-                        lambda x: pd.to_datetime(int(x), unit="ms") if pd.notna(x) else None
-                    )
+                    df[col] = pd.to_datetime(df[col], unit="ms", errors="coerce")
     
             frames.append(df)
         else:
@@ -164,13 +162,18 @@ def parse_train_moments(train_files, stations_df):
     result = pd.concat(frames, ignore_index=True)
 
     # Map STANOX → 3ALPHA station code
-    station_map = dict(zip(stations_df["stanox"], stations_df["tlc"]))
+    station_code_map = dict(zip(stations_df["stanox"], stations_df["tlc"]))
+    station_name_map = dict(zip(stations_df["stanox"], stations_df["station"]))
     result["station_code"] = (
         result["loc_stanox"]
         .apply(lambda x: str(int(x)).zfill(5) if pd.notna(x) else None)
-        .map(station_map)
+        .map(station_code_map)
     )
-
+    result["station_name"] = (
+        result["loc_stanox"]
+        .apply(lambda x: str(int(x)).zfill(5) if pd.notna(x) else None)
+        .map(station_name_map)
+    )
     return result
 
 
