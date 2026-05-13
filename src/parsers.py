@@ -16,21 +16,64 @@ def load_file(path):
     else:
         return pd.read_json(path, lines=True)
 
+import time
 
+from multiprocessing import Pool, cpu_count
+import pandas as pd
+
+def parse_darwin_timetable_files_parallel(timetable_files):
+    
+    with Pool(cpu_count()) as p:
+        dfs = p.map(parse_one_file, timetable_files)
+
+    
+    return pd.concat(dfs, ignore_index=True)
+
+def parse_one_file(file_path):
+    
+    with open(file_path, "r") as f:
+        data = json.load(f)
+
+    journeys = data if isinstance(data, list) else [data]
+    
+    print(f"Processing {file_path} with {len(journeys)} journeys")
+    rows = []
+    for journey in journeys:
+        rows.extend(_journey_to_rows(journey))
+    return pd.DataFrame(rows)
 
 def parse_darwin_timetable_files(timetable_files):
     """Read one or more JSON timetable files and return a flat DataFrame."""
     rows = []
+
+    start_total = time.time()
+    
     for file_path in timetable_files:
-        with open(file_path, "r") as f:
-            data = json.load(f)
+        
+        if file_path == "data\darwin_timetable\PPTimetable_20260427020459_v8.json":
+            t0 = time.time()
+    
+            with open(file_path, "r") as f:
+                data = json.load(f)
+            print("Load:", time.time() - t0)
 
-        journeys = data if isinstance(data, list) else [data]
-        print(f"Processing {file_path} with {len(journeys)} journeys")
+            t1 = time.time()
+        
+            journeys = data if isinstance(data, list) else [data]
+            print(f"Processing {file_path} with {len(journeys)} journeys")
 
-        for journey in journeys:
-            rows.extend(_journey_to_rows(journey))
+            print("Print length:", time.time() - t1)
 
+            t2 = time.time()
+            
+            for journey in journeys:
+                rows.extend(_journey_to_rows(journey))
+        
+            print("Parse:", time.time() - t2)
+        else:
+            continue
+
+    print("Total:", time.time() - start_total)   
     return pd.DataFrame(rows)
 
 
@@ -41,6 +84,7 @@ def _journey_to_rows(journey):
     uid = attrs.get("uid")
     train_id = attrs.get("trainId")
     ssd = attrs.get("ssd")
+    ssd_date = pd.to_datetime(ssd).date()
     toc = attrs.get("toc")
 
     rows = []
@@ -50,7 +94,7 @@ def _journey_to_rows(journey):
             "rid": rid,
             "uid": uid,
             "trainId": train_id,
-            "ssd": pd.to_datetime(ssd).date(),
+            "ssd": ssd_date,
             "toc": toc,
             "stop_type": child.get("tag"),
             "tpl": stop.get("tpl"),

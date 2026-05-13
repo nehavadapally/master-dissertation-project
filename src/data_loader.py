@@ -32,7 +32,7 @@ from src.config import (
     HSP_BASE_URL,
     HSP_SERVICE_DETAILS_HEADERS 
 )
-from src.parsers import load_file, parse_darwin_timetable_files, parse_service_details
+from src.parsers import load_file, parse_darwin_timetable_files, parse_service_details, parse_darwin_timetable_files_parallel
 # ---------------------------------------------------------------------------
 # Road Network Data
 # ---------------------------------------------------------------------------
@@ -213,7 +213,8 @@ def load_darwin_timetable(start_utc, end_utc):
 
     # If we already have all files locally, skip Azure
     if local_files:
-        return parse_darwin_timetable_files(local_files)
+        return parse_darwin_timetable_files_parallel(local_files)
+        # return parse_darwin_timetable_files(local_files)
 
     # ---------------------------------------------------------
     # STEP 2 - Otherwise fetch from Azure
@@ -266,7 +267,8 @@ def load_darwin_timetable(start_utc, end_utc):
     # ---------------------------------------------------------
     # STEP 3 - Parse all timetable JSON files
     # ---------------------------------------------------------
-    return parse_darwin_timetable_files(downloaded_files)
+    return parse_darwin_timetable_files_parallel(local_files)
+    # return parse_darwin_timetable_files(downloaded_files)
 
 def get_service_details(timetable_df):
     url = f"{HSP_BASE_URL}/serviceDetails"

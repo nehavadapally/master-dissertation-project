@@ -23,15 +23,16 @@ def reshape_timetable_to_schedule(timetable_df, stations_df):
 
     # Lookup maps
     tpl_lookup = (
-        stations_df[["tiploc", "tlc", "stanox"]]
+        stations_df[["tiploc", "tlc", "stanox","station"]]
         .drop_duplicates(subset="tiploc")
-        .rename(columns={"tlc": "station_code"})
+        .rename(columns={"tlc": "station_code","station": "station_name"})
     )
 
     df["station_code"] = df["tpl"].map(tpl_lookup.set_index("tiploc")["station_code"])
     df["stanox"] = df["tpl"].map(tpl_lookup.set_index("tiploc")["stanox"])
+    df["station_name"] = df["tpl"].map(tpl_lookup.set_index("tiploc")["station_name"])
     df["timetable_train_id"] = df["trainId"]
-    keep_cols = ["ssd", "tpl", "station_code", "stanox", "timetable_train_id"]
+    keep_cols = ["ssd", "tpl", "station_code", "stanox", "station_name", "timetable_train_id"]
     df["act"] = df["act"].apply(clean_act)
 
     # print(df["act"].dtype)
@@ -94,7 +95,9 @@ def reshape_timetable_to_schedule(timetable_df, stations_df):
 
 def merge_on_station(left_df, right_df, join_col="station_code"):
     """Inner-join two DataFrames on a station column."""
-    return left_df.merge(right_df, left_on=["start_date",join_col], right_on = ['actual_date',join_col], how="inner")
+    df = left_df.merge(right_df, left_on=["start_date",join_col], right_on = ['actual_date',join_col], how="inner")
+    df = df.rename(columns={"station_name_x": "station_name"}).drop(columns=["station_name_y"])
+    return df
 
 
 def merge_schedule_with_closures(expanded_road_df, schedule_df):
@@ -103,11 +106,10 @@ def merge_schedule_with_closures(expanded_road_df, schedule_df):
         schedule_df, left_on=['start_date',"stanox"], right_on = ['ssd','stanox'], how="inner",
         suffixes=("_road", "_schedule"),
     )
-    # Keep schedule versions of duplicated columns
-    merged["tpl"] = merged["tpl_schedule"]
-    merged["station_code"] = merged["station_code_schedule"]
+    # rename schedule versions of duplicated columns
+    merged = merged.rename(columns= {"station_name_schedule": "station_name", "station_code_schedule": "station_code", "tpl_schedule": "tpl"} )
     merged = merged.drop(
-        columns=["tpl_road", "tpl_schedule", "station_code_road", "station_code_schedule"]
+        columns=["tpl_road", "station_code_road", "station_name_road",]
     )
     return merged
 
