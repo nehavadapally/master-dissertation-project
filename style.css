@@ -1,0 +1,594 @@
+/* =============================================================
+   Road-Rail Resilience  |  style.css
+   Sections:
+     1.  Base reset
+     2.  Layout shell (sidebar + main)
+     3.  Topbar & pills
+     4.  Sidebar & nav radio
+     5.  Filterbar
+     6.  Map & content panels
+     7.  Tables
+     8.  Accordions
+     9.  Buttons
+     10. LLM briefing panel
+     11. Gap & visibility fixes
+   ============================================================= */
+
+
+/* ── 1. Base reset ─────────────────────────────────────────── */
+*, body, .gradio-container, .gradio-container * {
+  font-family: Arial, sans-serif !important;
+  box-sizing: border-box !important;
+}
+html, body {
+  background: #eef2f6 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+}
+.gradio-container {
+  width: 1150px !important;
+  max-width: 1150px !important;
+  margin: 0 auto !important;
+  background: #f0f4f8 !important;
+  padding: 0 !important;
+}
+
+
+/* ── 2. Layout shell ───────────────────────────────────────── */
+#rr-shell {
+  display: grid !important;
+  grid-template-columns: 155px 1fr !important;
+  width: 100% !important;
+  max-width: 1150px !important;
+  margin: 0 auto !important;
+  overflow: hidden !important;
+}
+#rr-side {
+  width: 155px !important;
+  background: #fff !important;
+  border-right: 1px solid #dde3ea !important;
+  padding: 0 !important;
+  overflow-y: visible !important;
+}
+#rr-main,
+div#rr-main {
+  gap: 0 !important;
+  row-gap: 0 !important;
+  padding: 0 !important;
+}
+#rr-main > .block,
+#rr-main > .form,
+#rr-main > fieldset {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+
+/* ── 3. Topbar & pills ─────────────────────────────────────── */
+.rr-topbar {
+  background: #1a3a5c !important;
+  border-bottom: 4px solid #1d70b8;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.rr-logo {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff;
+  border-right: 2px solid rgba(255,255,255,.25);
+  padding-right: 14px;
+}
+.rr-topbar h1 {
+  font: 700 1rem/1.25 Arial;
+  color: #fff;
+  margin: 0 0 2px;
+}
+.rr-topbar p {
+  font: 400 0.7rem Arial;
+  color: #c8d8e8;
+  margin: 0;
+}
+.rr-pills {
+  background: #e8f0f8 !important;
+  border-bottom: 1px solid #c8d8e8;
+  padding: 6px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+}
+.rr-pills span {
+  font: 600 0.72rem Arial;
+  color: #1a3a5c;
+  padding-right: 20px;
+  border-right: 1px solid #c8d8e8;
+  white-space: nowrap;
+}
+.rr-pills span:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+
+/* ── 4. Sidebar & nav radio ────────────────────────────────── */
+.rr-nav-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #6b7a8d;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid #eef0f3;
+}
+.rr-radio {
+  width: 100% !important;
+}
+.rr-radio fieldset {
+  border: 0 !important;
+  padding: 4px 0 !important;
+  margin: 0 !important;
+  background: #fff !important;
+}
+.rr-radio label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 7px 10px !important;
+  margin: 2px 0 !important;
+  border-left: 3px solid transparent !important;
+  border-radius: 2px !important;
+  cursor: pointer !important;
+}
+.rr-radio label:hover {
+  background: #e8f0f8 !important;
+}
+.rr-radio input[type="radio"] {
+  appearance: auto !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin-right: 6px !important;
+  accent-color: #1d70b8 !important;
+}
+.rr-radio label:has(input[type="radio"]:checked) {
+  background: #e8f0f8 !important;
+  border-left-color: #1d70b8 !important;
+  font-weight: 700 !important;
+  color: #1d70b8 !important;
+}
+
+
+/* ── 5. Filterbar ──────────────────────────────────────────── */
+#rr-filterbar {
+  background: #fff !important;
+  border-bottom: 2px solid #dde3ea !important;
+  padding: 0 !important;
+}
+#rr-filterbar .block,
+#rr-filterbar .form,
+#rr-filterbar > div,
+#rr-filterbar fieldset {
+  background: #fff !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Fields row */
+#rr-filterbar-row {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  border-bottom: 1px solid #eef0f3 !important;
+  min-height: 68px !important;
+}
+#rr-filterbar .rr-fb-col {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 1 auto !important;
+  padding: 8px 10px !important;
+  border-right: 1px solid #eef0f3 !important;
+  background: #fff !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+#rr-filterbar .rr-fb-col-last {
+  border-right: none !important;
+}
+
+/* Labels */
+#rr-filterbar label,
+#rr-filterbar span.svelte-1b6s6g1 {
+  display: block !important;
+  font-size: 0.65rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  color: #1a3a5c !important;
+  margin-bottom: 6px !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  line-height: 1.2 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  background: transparent !important;
+}
+span.svelte-jdcl7l:not(.has-info) {
+  color: #1a3a5c !important;
+}
+
+/* Text, date & time inputs */
+#rr-filterbar input[type="text"],
+#rr-filterbar input[type="date"],
+#rr-filterbar input[type="time"] {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid #1d70b8 !important;
+  border-radius: 0 !important;
+  color: #1a3a5c !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  padding: 3px 0 4px !important;
+  width: 100% !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+#rr-filterbar input[type="text"]:focus,
+#rr-filterbar input[type="date"]:focus,
+#rr-filterbar input[type="time"]:focus {
+  border-bottom-color: #1a3a5c !important;
+}
+
+/* Dropdowns */
+#rr-filterbar .wrap {
+  border: none !important;
+  border-bottom: 2px solid #1d70b8 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+#rr-filterbar .wrap input,
+#rr-filterbar .wrap svg {
+  background: transparent !important;
+  color: black !important;
+}
+#rr-filterbar .wrap .selected-item span,
+#rr-filterbar select {
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  color: #1a3a5c !important;
+}
+
+/* Number inputs */
+.rr-fb-number input[type="number"] {
+  color: #1a3a5c !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  border: 1px solid #c8d8e8 !important;
+  border-radius: 3px !important;
+  padding: 4px 6px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  outline: none !important;
+  width: 100% !important;
+}
+.rr-fb-number input[type="number"]:focus {
+  border-color: #1d70b8 !important;
+  box-shadow: 0 0 0 2px rgba(29,112,184,0.15) !important;
+}
+.rr-fb-number input[type="number"]::-webkit-inner-spin-button {
+  opacity: 0.6 !important;
+  height: 24px !important;
+}
+.rr-fb-number .copy-text,
+.rr-fb-number .clear-button {
+  display: none !important;
+}
+
+/* Button row */
+#rr-filterbar-btnrow {
+  background: #f4f7fb !important;
+  border-top: 1px solid #eef0f3 !important;
+  padding: 6px 16px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+}
+#rr-filterbar-btnrow > div,
+#rr-filterbar-btnrow .block {
+  width: auto !important;
+  flex: 0 0 auto !important;
+}
+#rr-load-btn {
+  background: #1d70b8 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 2px !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  padding: 7px 32px !important;
+  min-width: 120px !important;
+  max-width: 180px !important;
+}
+#rr-load-btn:hover {
+  background: #1a3a5c !important;
+}
+
+
+/* ── 6. Map & content panels ───────────────────────────────── */
+.rr-map-wrap {
+  border-bottom: 1px solid #dde3ea;
+  background: #fff !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+.rr-map-wrap iframe,
+.rr-map-wrap > div {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.rr-content {
+  padding: 14px 16px !important;
+  background: #f0f4f8 !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+.rr-panel-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: #1a3a5c;
+  border-bottom: 2px solid #1d70b8;
+  padding-bottom: 5px;
+  margin: 0 0 10px;
+}
+.rr-note {
+  background: #f0f6ff !important;
+  border: 1px solid #c8d8e8;
+  border-left: 4px solid #1d70b8;
+  padding: 7px 11px;
+  font-size: 0.82rem;
+  color: #1a3a5c;
+  margin-bottom: 8px;
+}
+.rr-pred {
+  background: #fff !important;
+  border: 1px solid #dde3ea;
+  border-top: 4px solid #00703c;
+  padding: 12px 14px;
+}
+.rr-clickable-hint {
+  font-size: 0.7rem;
+  color: #505a5f;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+
+/* ── 7. Tables ─────────────────────────────────────────────── */
+.gradio-dataframe,
+.gradio-dataframe * {
+  background: #fff !important;
+}
+.gradio-dataframe thead tr th {
+  background: #1a3a5c !important;
+  color: #fff !important;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  padding: 8px 10px !important;
+}
+.gradio-dataframe tbody tr:nth-child(even) td {
+  background: #f0f4f8 !important;
+}
+.gradio-dataframe tbody tr:hover td {
+  background: #ddeeff !important;
+}
+.gradio-dataframe tbody td {
+  font-size: 0.76rem !important;
+  color: #1a3a5c !important;
+  padding: 6px 10px !important;
+  border-bottom: 1px solid #eef0f3 !important;
+}
+
+
+/* ── 8. Accordions ─────────────────────────────────────────── */
+details,
+.gradio-accordion {
+  border: 1px solid #dde3ea !important;
+  border-radius: 2px !important;
+  background: #fff !important;
+  margin-bottom: 6px !important;
+}
+details summary,
+.gradio-accordion .label-wrap {
+  background: #f4f7fb !important;
+  padding: 9px 14px !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  color: #1a3a5c !important;
+  border: none !important;
+}
+#rr-llm-accordion summary,
+#rr-llm-accordion .label-wrap {
+  background: #e8f0f8 !important;
+  color: #1a3a5c !important;
+  font-weight: 700 !important;
+}
+
+
+/* ── 9. Buttons ────────────────────────────────────────────── */
+button.primary {
+  background: #1d70b8 !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  border-radius: 2px !important;
+  font-size: 0.875rem !important;
+  width: 100% !important;
+  border: none !important;
+}
+button.primary:hover {
+  background: #1a3a5c !important;
+}
+
+
+/* ── 10. LLM briefing panel ────────────────────────────────── */
+.rr-llm-summary {
+  background: #fff !important;
+  border: 1px solid #dde3ea;
+  border-left: 4px solid #1d70b8;
+  padding: 12px 16px;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: #1a3a5c;
+  margin: 4px 0;
+}
+.rr-llm-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #505a5f;
+  margin-bottom: 8px;
+}
+.rr-llm-text {
+  margin: 0;
+  color: #1a3a5c;
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+.rr-llm-error {
+  border-left-color: #d4351c !important;
+  color: #d4351c !important;
+  font-size: 0.78rem;
+}
+.rr-llm-loading {
+  border-left-color: #f47738 !important;
+  color: #505a5f !important;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rr-llm-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #c8d8e8;
+  border-top-color: #1d70b8;
+  border-radius: 50%;
+  animation: rr-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes rr-spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* ── 11. Gap & visibility fixes ────────────────────────────── */
+
+/* Gradio internal gap reset */
+div.svelte-siq5d6 {
+  gap: 0 !important;
+}
+
+/* Hide main blocks that contain hidden children */
+#rr-main > .block:has(> .hide),
+#rr-main > .block:has(> .hidden),
+#rr-main > div > .block:has(> .hide),
+#rr-main > div > .block:has(> .hidden) {
+  display: none !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+
+/* Dashboard inline note (amber background) */
+.rr-content div[style*="fff8e1"],
+.rr-content div[style*="#fff8e1"] {
+  color: #78350f !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.rr-content div[style*="fff8e1"] *,
+.rr-content div[style*="#fff8e1"] * {
+  color: inherit !important;
+}
+
+/* Prediction risk-band cards */
+.rr-content div[style*="justify-content:space-between"] span,
+.rr-content div[style*="font-size:0.75rem"],
+.rr-content div[style*="font-size:0.75rem"] span {
+  color: #1a3a5c !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Dark table headers (keep white text) */
+.rr-content div[style*="background:#1a3a5c"],
+.rr-content div[style*="background: #1a3a5c"] {
+  color: #fff !important;
+}
+.rr-content div[style*="background:#1a3a5c"] *,
+.rr-content div[style*="background: #1a3a5c"] * {
+  color: inherit !important;
+}
+
+/* Top-risk percentage (red) */
+.rr-content span[style*="#d4351c"] {
+  color: #d4351c !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Protect Gradio plots from inherited overrides */
+.rr-content .gradio-plot,
+.rr-content [data-testid="plot"],
+.rr-content .plot-container,
+.rr-content .js-plotly-plot,
+.rr-content canvas,
+.rr-content svg,
+.rr-content img {
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+}
+.rr-content .gradio-plot *,
+.rr-content [data-testid="plot"] *,
+.rr-content .plot-container *,
+.rr-content .js-plotly-plot * {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Hide filterbar when Gradio marks it hidden */
+#rr-filterbar.hide,
+#rr-filterbar.hidden,
+#rr-filterbar[style*="display: none"],
+#rr-filterbar[style*="visibility: hidden"],
+.block:has(#rr-filterbar.hide),
+.block:has(#rr-filterbar.hidden),
+.block:has(#rr-filterbar[style*="display: none"]),
+.form:has(#rr-filterbar.hide),
+.form:has(#rr-filterbar.hidden),
+.form:has(#rr-filterbar[style*="display: none"]) {
+  display: none !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+}

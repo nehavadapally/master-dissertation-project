@@ -1,7 +1,5 @@
 # Road–Rail Resilience: Early Warning Model for Multi-Modal Disruption
-### Industry Research Report - Kainos MSc Dissertation 2026
 
----
 
 ## 1: Introduction
 <p align="justify">
@@ -27,7 +25,7 @@ Three research questions organise the work:
 Section 2 reviews the relevant literature. Section 3 sets out the motivation and value framing. Section 4 describes the data sources and system design. Section 5 presents exploratory analysis of each dataset. Section 6 covers the modelling pipeline and results. Section 7 evaluates the findings critically and sets out conclusions.
 </p>
 
----
+
 ## 2: Literature Review
  
 <p align="justify">
@@ -106,8 +104,6 @@ The regulatory context reinforces the technical case. The ORR requires that perf
 No published study has built a predictive model targeting cross-modal road-to-rail disruption at national scale using open data, geospatially derived proximity features and interpretable classifiers. The methodological components exist separately in the literature. The integration does not. That is the gap this project addresses.
 </p>
 
----
-
 ## 3: Motivation
  
 <p align="justify">
@@ -158,7 +154,6 @@ The modelling result from the current 72-hour window is a null finding: no indiv
 Beyond the immediate scope, the pipeline architecture supports three extensions that increase commercial value progressively. <strong>Street Manager integration</strong> would add emergency permit data for unplanned works, which is the closure category with the shortest lead time and therefore the greatest need for early warning. <strong>Annual Average Daily Flow (AADF) features</strong> from the Department for Transport road traffic count dataset would allow the model to weight closures by the volume of traffic they displace, distinguishing between a major motorway incident and a minor A-road closure that happen to share similar DATEX II record structures. <strong>Journey-level modelling</strong> via route identifier chaining in the Darwin timetable would allow the system to surface specific services at risk rather than aggregating to station level.
 </p>
 
----
 
 ### 4.1 Data Sources
  
@@ -179,13 +174,13 @@ Beyond the immediate scope, the pipeline architecture supports three extensions 
 <p align="justify">
 <a href="https://raildata.org.uk/dashboard/dataProduct/P-9ca6bc7e-62e1-44d6-b93a-1616f7d2caf8/overview">Darwin timetable</a> files are published as full timetable snapshots in XML format. Files are streamed and parsed incrementally using <code>iterparse</code> to avoid loading the full document into memory. Each journey carries a route identifier (<code>rid</code>), train identifier (<code>trainId</code>), service date (<code>ssd</code>) and operating company (<code>toc</code>), with child elements representing individual stops typed as origin, intermediate, pass or destination. Working times and public times are extracted per stop. Unlike the TRUST feed, the timetable provides forward-looking scheduled timestamps for services not yet operated, enabling prediction before outcomes are observed.
 </p>
+
 <p align="justify">
 <a href="https://www.doogal.co.uk/UkStations">GB Stations</a> provides 2,595 station records with latitude, longitude, three-letter code (TLC), NLC, operator and annual footfall from 2005 to 2025. This is the primary spatial reference for the haversine distance join. 
 
 <a href="https://raildata.org.uk/dashboard/dataProduct/P-9d26e657-26be-496b-b669-93b217d45859/overview">CORPUS</a> provides 55,920 TIPLOC records mapping between STANOX codes used in TRUST, TIPLOC codes used in Darwin and 3ALPHA codes equivalent to TLC. This crosswalk is the mechanism that links all three data sources through a common station identifier.
 </p>
 
----
 ## 4.2 Entity Relationship Diagram
 ```mermaid
 erDiagram
@@ -256,7 +251,6 @@ erDiagram
     
 
 ```
----
 
 ## 4.3 Identifier Crosswalk Flow
 
@@ -279,7 +273,6 @@ flowchart LR
 This crosswalk is essential for linking train movement records which carry STANOX -> to the station coordinate table which is indexed by TLC.
 </p>
 
----
 ## 4.4 Pipeline Architecture
 
 <p align="justify">
@@ -410,7 +403,7 @@ Each data source is examined independently before any joining takes place. The p
 - 2,595 raw records; 2,594 after CORPUS crosswalk, 99.96 percent match rate on STANOX and TIPLOC
 - 34 operators largest by station count: Northern Trains (482), ScotRail (360), Transport for Wales (248), Great Western Railway (201), South Western Railway (176)
 - All spatial fields fully populated, no coordinate gaps
----
+
 
 ### 5.2 Road Closures (EDA 02)
  
@@ -431,9 +424,6 @@ Each data source is examined independently before any joining takes place. The p
 | `lanes_closed` | int | `1` | Range 0 to 4; 155 records carry 0 (full carriageway) |
 | `road_name` | string | `M40` | SRN motorways and major A-roads |
  
-
-![Alt text](notebooks\figures\eda_02\active_closures_timeline.png)
-
 **Key findings:**
 - 352 records; 214 planned, 138 unplanned; 0 percent missing on all critical fields
 - Cause type and closure type are perfectly correlated,  `roadOrCarriagewayOrLaneManagement` appears exclusively in unplanned records sourced from Signs and Signals
@@ -441,9 +431,6 @@ Each data source is examined independently before any joining takes place. The p
 - Duration range 0.25 to 17,544 hours, median 8 hours, mean 746 hours inflated by 41 long-running works extending to 2028
 - 155 records carry zero lanes closed indicating full carriageway closure rather than partial lane restriction
 
-
- 
----
 
 ### 5.3 Train Moments (EDA 03)
  
@@ -464,7 +451,7 @@ Each data source is examined independently before any joining takes place. The p
 | `delay_monitoring_point` | bool | `True` | Official punctuality timing point; 46.0 percent True |
 | `data_source` | string | `SMART` | SMART 88.4 percent; GPS and TSIA supplement |
 
-![Alt text](notebooks\figures\eda_03\temporal_movements.png)
+![Alt text](notebooks/figures/eda_03/temporal_movements.png)
  
 **Key findings:**
 - 39,091 clean rows after dropping 1,858 records missing both timestamps
@@ -473,7 +460,6 @@ Each data source is examined independently before any joining takes place. The p
 - Station code match rate 72.7 percent; unmatched records carry STANOX codes for junctions, sidings and non-passenger locations
 - Top stations by movement count: Clapham Junction (221), London Bridge (133), Vauxhall (114)
  
----
 
 ### 5.4 Darwin Timetable (EDA 04)
  
@@ -503,7 +489,7 @@ Each data source is examined independently before any joining takes place. The p
 - Working times (wta / wtd) present for 53.5 percent of rows, wtp for 40.0 percent, missing values reflect pass-point stops with no arrival or departure record
 - 61.4 percent of rows carry a matched TIPLOC and are spatially eligible for the haversine join, remainder are junctions, depots and non-station locations
 - Median journey length 14 stops, range 2 to 150, peak service density 16:00 to 18:00 UTC
----
+
 
 ### 5.5 Merged Analytical Datasets (EDA 05 and EDA 06)
  
@@ -549,7 +535,6 @@ All correlations are effectively zero. This is the single most consequential EDA
 - Pearson r between all predictors and delay is effectively zero, no linear signal detected
 - 60-minute window records are uniformly distributed across 10-minute sub-buckets no temporal filter bias
 
----
 
 # 6: Modelling & Prediction Pipeline
 
@@ -560,7 +545,6 @@ The retrospective dataset (93,749 labelled rows) is the training input. The targ
 LSTM and other sequential architectures were considered and rejected on three grounds. The 72-hour observation window does not provide the volume of sequential labelled data these models require. The TRUST feed does not consistently carry a route identifier in real time, so constructing the stop sequences an LSTM would consume requires a Darwin timetable join that adds its own error. And interpretability is a requirement here: a prediction that cannot be decomposed into feature contributions is difficult to act on in a control room context.
 </p>
 
----
 
 ### 6.1 Feature Set and Data Architecture
  
@@ -584,7 +568,6 @@ Four fields were explicitly excluded. <code>road_name</code> has high cardinalit
 The pipeline uses tabular parquet files throughout rather than graph or key-value structures. This was a deliberate choice. A graph structure with stations as nodes and shared route segments as edges would support journey-level propagation modelling, but that is out of scope here: station-level analysis does not require edge traversal. Key-value storage is already handled at the Azure Blob layer. Parquet was chosen over CSV for intermediate outputs because column pruning allows downstream notebooks to load only the fields they need from a 2.86M-row file, Snappy compression reduces storage footprint by approximately 70 percent, and schema enforcement catches type errors at write time rather than at analysis time.
 </p>
 
----
 
 ### ML Training Pipeline
 
@@ -637,9 +620,6 @@ flowchart TD
     PRED --> NOTE
 ```
 
----
-
-
 ### 6.2 Training
  
 <p align="justify">
@@ -652,8 +632,6 @@ An 80/20 temporal split is used rather than random cross-validation. Random spli
 <p align="justify">
 Linear Regression solves for the coefficient vector <strong>w</strong> that minimises the sum of squared residuals via the normal equation: <code>w = (X^T X)^-1 X^T y</code>. This produces an exact solution in one matrix operation with no hyperparameters and no iterative convergence, which is why training completes in 0.08 seconds. For Gradient Boosting and XGBoost, the algorithm fits an ensemble of shallow trees sequentially, each tree learning the residuals of the previous ensemble. When residuals carry no learnable pattern as is the case here where predictor correlations are near zero each successive tree fits noise rather than signal, and the ensemble grows without improving. This is the direct explanation for why both methods underperform Linear Regression despite being computationally more expensive.
 </p>
-
----
 
 ### 6.3 Results
  
@@ -669,7 +647,6 @@ Linear Regression solves for the coefficient vector <strong>w</strong> that mini
 Linear Regression achieves the lowest MAE at 2.182 minutes and trains in 0.08 seconds. All five models produce negative R2, meaning none outperforms a naive mean predictor on the test set. The feature coefficients confirm why: <code>event_type_ARRIVAL</code> carries +0.055, <code>closure_type_planned</code> carries +0.054, <code>distance_in_km</code> carries -0.025, and <code>planned_time_diff</code> carries effectively zero. All coefficients are small. The model predicts close to the training mean for every input, which is precisely what near-zero predictor correlations would produce.
 </p>
 
----
 
 ### 6.4 Inference and Forward Prediction
  
@@ -683,7 +660,6 @@ The negative R2 is the headline result. Three explanations are plausible and not
 
 ![Alt text](notebooks\figures\model\predicted_delay_distribution.png)
 
----
 
 ## 7: Critical Evaluation and Conclusions
  
@@ -704,7 +680,6 @@ Two data sources identified in the project scope were not integrated in this pro
 The TIPLOC match rate of 61.4 percent at row level in the Darwin timetable means that approximately 38.6 percent of scheduled stop rows are ineligible for the spatial join. These are predominantly pass-point stops at junctions and depots. They do not represent a bias in the dataset but they reduce the volume of forward prediction rows that can be meaningfully scored.
 </p>
 
----
 
 ### 7.2 Research Question Answers
  
@@ -719,7 +694,6 @@ The TIPLOC match rate of 61.4 percent at row level in the Darwin timetable means
 <strong>RQ3: What pipeline architecture supports reproducible analysis and integration into an operational transport platform?</strong> The four-layer pipeline documented in Section 4 and Section 6 demonstrates end-to-end feasibility: road closure data ingested via REST, train moments streamed from Kafka, timetable data parsed from XML, all cached in Azure Blob Storage, processed through a decoupled Python library, and scored via a serialised pipeline object. The architecture is reproducible across any future time window without modification. Moving from batch to event-driven inference requires a scheduler wrapper around existing processing logic rather than changes to the pipeline itself.
 </p>
 
----
  
 ### 7.3 Future Work
  
@@ -735,7 +709,6 @@ Five extensions are identified in order of expected impact on model performance.
 | 4 | Integrate Street Manager emergency works data | Adds the closure category with shortest lead time and highest early warning value; data already ingested |
 | 5 | Journey-level modelling via rid chaining in Darwin timetable | Surfaces specific services at risk rather than aggregating to station level |
 
----
  
 ### 7.4 Conclusion
  
@@ -745,5 +718,3 @@ This project demonstrates that a lightweight open-data pipeline can integrate ro
 <p align="justify">
 The modelling result is a quantified null finding. The Pearson r of negative 0.018 and R2 of negative 0.014 set a documented baseline. They do not establish that road closures have no effect on rail punctuality. They establish that detecting such an effect, if it exists, requires more data, finer spatial resolution and features that encode the volume of traffic displaced rather than the administrative metadata of the closure event. The pipeline and feature set are in place to run that experiment. The next step is data.
 </p>
-
----

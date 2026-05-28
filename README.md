@@ -1,6 +1,5 @@
 # Rail Delay Prediction
 ### Road–Rail Resilience: Early Warning Model for Multi-Modal Disruption
-**Kainos MSc Dissertation 2026**
 
 Predicts the probability of rail service delays caused by nearby road closures on the Strategic Road Network (SRN), using real-time and scheduled UK road and rail data ingested from Azure Blob Storage.
 
@@ -136,8 +135,8 @@ Primary evaluation metrics: ROC-AUC and F1 score (appropriate given class imbala
 | Finding | Value |
 |---------|-------|
 | Observation window | 10–13 April 2026 (72 hours) |
-| Road closures | 352 total — 214 planned, 138 unplanned |
-| Train moments (clean) | 39,091 rows — 38.1% delayed (variation_status) |
+| Road closures | 352 total - 214 planned, 138 unplanned |
+| Train moments (clean) | 39,091 rows - 38.1% delayed (variation_status) |
 | Raw delay distribution | Median 1 min, mean 2.53 min, max 293 min (skewness 12.31) |
 | Timetable stop rows | ~1.9M across ~121K journeys |
 | Retrospective dataset | 93,749 rows, 184 closures, 1373 stations |
