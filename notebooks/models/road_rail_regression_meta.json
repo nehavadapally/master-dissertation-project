@@ -1,0 +1,32 @@
+{
+  "model_name": "XGBoost_regularised",
+  "features": [
+    "has_road_closure",
+    "road_closure_count",
+    "n_unplanned_closures",
+    "min_distance_km",
+    "mean_distance_km",
+    "max_effective_duration_hours",
+    "mean_effective_duration_hours",
+    "inv_distance_sum",
+    "total_closure_severity",
+    "max_road_class",
+    "closures_lag1d",
+    "closures_lag3d",
+    "closures_lag7d",
+    "day_of_week",
+    "is_weekend",
+    "is_monday",
+    "is_friday",
+    "train_movements"
+  ],
+  "target": "mean_delay_minutes",
+  "delay_winsorise_p01": -4.0,
+  "delay_winsorise_p99": 11.5,
+  "duration_cap_hours": 503.9997222222222,
+  "mae": 1.5542,
+  "rmse": 2.39,
+  "r2": 0.0106,
+  "train_rows": 24746,
+  "test_rows": 9195
+}
