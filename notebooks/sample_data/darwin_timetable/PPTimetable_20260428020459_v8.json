@@ -1,0 +1,356 @@
+{
+    "tag": "Journey",
+    "attributes": {
+      "rid": "202604288042261",
+      "uid": "P42261",
+      "trainId": "1N23",
+      "ssd": "2026-04-28",
+      "toc": "SN",
+      "trainCat": "XX"
+    },
+    "text": "",
+    "children": [
+      {
+        "tag": "OR",
+        "attributes": {
+          "tpl": "SOTON",
+          "act": "TB",
+          "plat": "2A",
+          "ptd": "10:50",
+          "wtd": "10:50"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "NTHMJN",
+          "wtp": "10:52:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "STDENYS",
+          "wtp": "10:54:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "WOLS803",
+          "wtp": "10:57:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "WOLSTON",
+          "act": "T ",
+          "plat": "2",
+          "pta": "10:59",
+          "ptd": "10:59",
+          "wta": "10:59",
+          "wtd": "10:59:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "NETLEY",
+          "wtp": "11:02:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "BURSLDN",
+          "wtp": "11:05"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "SWNWICK",
+          "act": "T ",
+          "plat": "2",
+          "pta": "11:08",
+          "ptd": "11:08",
+          "wta": "11:07:30",
+          "wtd": "11:08"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "FAREHAM",
+          "act": "T ",
+          "plat": "3",
+          "pta": "11:14",
+          "ptd": "11:14",
+          "wta": "11:13:30",
+          "wtd": "11:14:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "COSHAM",
+          "act": "T ",
+          "plat": "2",
+          "pta": "11:22",
+          "ptd": "11:24",
+          "wta": "11:22",
+          "wtd": "11:24"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "COSHAMJ",
+          "wtp": "11:25"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "FRLNGTJ",
+          "wtp": "11:26"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "HAVANT",
+          "act": "T ",
+          "plat": "1",
+          "pta": "11:30",
+          "ptd": "11:30",
+          "wta": "11:29:30",
+          "wtd": "11:30:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "EMSWTH",
+          "act": "T ",
+          "plat": "1",
+          "pta": "11:34",
+          "ptd": "11:34",
+          "wta": "11:33:30",
+          "wtd": "11:34"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "SBOURNE",
+          "act": "T ",
+          "plat": "1",
+          "pta": "11:37",
+          "ptd": "11:37",
+          "wta": "11:36:30",
+          "wtd": "11:37"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "CHCHSTR",
+          "act": "T ",
+          "plat": "1",
+          "pta": "11:44",
+          "ptd": "11:44",
+          "wta": "11:43:30",
+          "wtd": "11:44:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "BRHM",
+          "act": "T ",
+          "plat": "3",
+          "pta": "11:52",
+          "ptd": "11:53",
+          "wta": "11:51:30",
+          "wtd": "11:53"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "FORD",
+          "act": "T ",
+          "plat": "1",
+          "pta": "11:57",
+          "ptd": "11:57",
+          "wta": "11:57",
+          "wtd": "11:57:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "ARUNDLJ",
+          "wtp": "12:00"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "ANGMRNG",
+          "act": "T ",
+          "pta": "12:04",
+          "ptd": "12:04",
+          "wta": "12:04",
+          "wtd": "12:04:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "PP",
+        "attributes": {
+          "tpl": "WWRTHNG",
+          "wtp": "12:09:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "WORTHNG",
+          "act": "T ",
+          "plat": "2",
+          "pta": "12:11",
+          "ptd": "12:12",
+          "wta": "12:11",
+          "wtd": "12:12"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "LNCG",
+          "act": "T ",
+          "plat": "1",
+          "pta": "12:16",
+          "ptd": "12:16",
+          "wta": "12:15:30",
+          "wtd": "12:16"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "SHRHMBS",
+          "act": "T ",
+          "plat": "1",
+          "pta": "12:20",
+          "ptd": "12:20",
+          "wta": "12:19:30",
+          "wtd": "12:20:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "STHWICK",
+          "act": "T ",
+          "plat": "1",
+          "pta": "12:23",
+          "ptd": "12:23",
+          "wta": "12:23",
+          "wtd": "12:23:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "PSLDAWH",
+          "act": "T ",
+          "plat": "1",
+          "pta": "12:27",
+          "ptd": "12:27",
+          "wta": "12:26:30",
+          "wtd": "12:27"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "IP",
+        "attributes": {
+          "tpl": "HOVE",
+          "act": "T ",
+          "plat": "2",
+          "pta": "12:30",
+          "ptd": "12:30",
+          "wta": "12:29:30",
+          "wtd": "12:30:30"
+        },
+        "text": "",
+        "children": []
+      },
+      {
+        "tag": "DT",
+        "attributes": {
+          "tpl": "BRGHTN",
+          "act": "TF",
+          "plat": "2",
+          "pta": "12:35",
+          "wta": "12:35"
+        },
+        "text": "",
+        "children": []
+      }
+    ]
+  }

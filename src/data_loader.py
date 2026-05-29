@@ -21,7 +21,7 @@ from src.config import (
     CONTAINER_DARWIN_TIMETABLE,
     CONTAINER_RAIL_ROAD_DATA,
     CONTAINER_ROAD_CLOSURES,
-    CONTAINER_TRAIN_MOMENTS,
+    CONTAINER_TRAIN_MOVEMENTS,
     DARWIN_TIMETABLE_DIR,
     RAIL_DIR,
     ROAD_DIR,
@@ -82,7 +82,7 @@ def load_stations_lookup() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Train moments
+# Train movements
 # ---------------------------------------------------------------------------
 
 def load_train_moment_files(start_utc, end_utc) -> list[str]:
@@ -92,14 +92,14 @@ def load_train_moment_files(start_utc, end_utc) -> list[str]:
 
     if not local:
         print("No local files found. Fetching from Azure...")
-        download_blobs_in_window(CONTAINER_TRAIN_MOMENTS, TRAIN_DIR, start_utc, end_utc)
+        download_blobs_in_window(CONTAINER_TRAIN_MOVEMENTS, TRAIN_DIR, start_utc, end_utc)
     else:
         print(f"Using {len(local)} local files within the time window.")
 
     return [os.path.join(TRAIN_DIR, f) for f in os.listdir(TRAIN_DIR)]
 
 
-def parse_train_moments(train_files: list[str], stations_df: pd.DataFrame) -> pd.DataFrame:
+def parse_train_movements(train_files: list[str], stations_df: pd.DataFrame) -> pd.DataFrame:
     """Parse train-moment files into a DataFrame with timestamps and station codes.
 
     Args:
