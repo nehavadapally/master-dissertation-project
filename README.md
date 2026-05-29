@@ -1,174 +1,232 @@
-# Rail Delay Prediction
-### Road–Rail Resilience: Early Warning Model for Multi-Modal Disruption
+# Road-Rail Resilience
 
-Predicts the probability of rail service delays caused by nearby road closures on the Strategic Road Network (SRN), using real-time and scheduled UK road and rail data ingested from Azure Blob Storage.
+A proof-of-concept machine learning project for detecting whether unplanned road closures on the Strategic Road Network and Major Road Network are associated with rail performance degradation at nearby stations.
 
----
+The project integrates open UK road and rail datasets, builds a station-day modelling dataset and presents the results through a Gradio dashboard for operational exploration.
 
-## Project Structure
+## Project Summary
 
-```
-rail-delay-prediction/
-├── .env.example                        # Credential template (copy to .env)
-├── .gitignore
-├── venv
-├── requirements.txt
+Road and rail disruption data are usually managed in separate systems. National Highways publishes road closure data through DATEX II feeds, while Network Rail and the Rail Delivery Group publish train movement and timetable data through TRUST and Darwin. This project links those sources to examine whether road closures within 10 to 25 kilometres of a rail station can act as a useful signal for predicting station-level rail delay.
+
+The final modelling task is defined at station-day level. A station-day is labelled as disrupted when the mean arrival delay is greater than five minutes. The project uses a supervised binary classification model to predict disruption risk and a complementary regression model to estimate expected delay magnitude.
+
+The main output is not only the model. A central contribution is the reusable data pipeline that joins DATEX II road closure data, TRUST train movement data, Darwin timetable data, GB station coordinates and CORPUS rail identifier mappings.
+
+## Key Features
+
+- Ingests and processes National Highways DATEX II road closure records
+- Processes Network Rail TRUST movement data for station-level delay analysis
+- Parses Darwin timetable data for forward prediction
+- Resolves station identifiers using CORPUS and GB Stations reference data
+- Links road closures to stations using a 10 to 25 km haversine distance band
+- Builds station-day features covering closure attributes, spatial severity, lag effects and temporal patterns
+- Trains classification and regression models using XGBoost and comparator models
+- Presents predictions through an interactive Gradio dashboard with maps, tables, charts and operational briefings
+
+## Repository Structure
+
+```text
+master-dissertation-project/
+├── app.py
 ├── README.md
-├── test_connection.py                  # Azure connection smoke test
+├── Report.md
+├── requirements.txt
+├── style.css
+├── test_connection.py
 ├── src/
 │   ├── __init__.py
-│   ├── config.py                       # Loads .env, defines container names & local paths
-│   ├── azure_client.py                 # Azure Blob Storage ops + local file caching
-│   ├── parsers.py                      # CSV/JSON loader + Darwin timetable parser
-│   ├── data_loader.py                  # Downloads & loads all data sources
-│   ├── geo.py                          # Haversine distance & closure-to-station matching
-│   └── features.py                     # Timetable reshaping, merge/filter, delay calc
+│   ├── azure_client.py
+│   ├── config.py
+│   ├── dashboard.py
+│   ├── data.py
+│   ├── data_loader.py
+│   ├── features.py
+│   ├── geo.py
+│   ├── layout.py
+│   ├── llm_summary.py
+│   ├── maps.py
+│   └── parsers.py
 └── notebooks/
+    ├── data/
+    │   └── processed/
     ├── data_ingestion/
-    │   ├── darwin_realtime_data.ipynb  # Darwin real-time feed ingestion to Azure
-    │   ├── road_closures_data.ipynb    # DATEX II road closure ingestion to Azure
-    │   └── train_moments_data.ipynb    # Network Rail TRUST Kafka stream to Azure
-    ├── eda_01_stations_reference.ipynb # GB stations + CORPUS crosswalk EDA
-    ├── eda_02_road_closures.ipynb      # Road closure EDA (296 records, 72h window)
-    ├── eda_03_train_moments.ipynb      # Train moments EDA (41,026 raw records)
-    ├── eda_04_darwin_timetable.ipynb   # Darwin timetable EDA (1.9M stop rows)
-    ├── eda_05_road_train_moments_dataset.ipynb  # Merged retrospective dataset (5,446 rows)
-    ├── eda_06_road_timetable_dataset.ipynb      # Merged prediction dataset (100,069 rows)
-    └── modelling.ipynb     # Modelling pipeline (main analysis)
+    │   ├── darwin_realtime_data.ipynb
+    │   ├── road_closures_data.ipynb
+    │   └── train_movements_data.ipynb
+    ├── figures/
+    ├── models/
+    └── classification_model.ipynb
+    ├── eda_01_stations_reference.ipynb
+    ├── eda_02_road_closures.ipynb
+    ├── eda_03_train_movements.ipynb
+    ├── eda_04_darwin_timetable.ipynb
+    ├── eda_05_road_train_movements_dataset.ipynb
+    ├── eda_06_road_timetable_dataset.ipynb
+    └── regression_model.ipynb
+
 ```
-
----
-
-## Setup
-
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 2. Configure credentials
-cp .env.example .env
-# Edit .env with your Azure Storage connection string and Kafka credentials
-
-# 3. Verify connection
-python test_connection.py
-
-# 4. Run EDA notebooks in order (eda_01 → eda_06), then the modelling notebook
-cd notebooks
-jupyter notebook modelling.ipynb
-```
-
----
 
 ## Data Sources
 
-| Source | Azure Container | Format | Records (72h window) |
-|--------|----------------|--------|----------------------|
-| Road closures (DATEX II) | `road-closures` | XML → CSV | 296 closures |
-| Train moments (TRUST) | `train-moments` | Kafka → CSV | 41,026 raw / 39,091 clean |
-| Darwin timetable | `darwin-timetable-feeds` | XML → JSON | ~1.9M stop rows |
-| GB stations reference | `rail-road-data` | CSV | 2,595 stations |
-| CORPUS TIPLOC lookup | `rail-road-data` | JSON | 55,920 records |
+| Dataset | Provider | Format | Role |
+|---|---|---:|---|
+| DATEX II Road and Lane Closures | National Highways | XML | Road closure event signal |
+| TRUST Train Movements | Network Rail | JSON or CSV | Actual train movement and delay signal |
+| Darwin Timetable | Rail Delivery Group | XML | Scheduled services for forward prediction |
+| GB Stations | Doogal | CSV | Station names, codes and coordinates |
+| CORPUS | Network Rail | JSON | STANOX, TIPLOC and CRS identifier mapping |
 
-All sources are open or licensed under Rail Data Marketplace terms. No personally identifiable information is processed at any stage.
+No personal data is used. The project uses operational and infrastructure datasets only.
 
----
+## Pipeline Overview
 
-## Approach
+```mermaid
+flowchart LR
+    A[DATEX II road closures] --> D[Road closure cleaning]
+    B[TRUST train movements] --> E[Station-day rail performance]
+    C[Darwin timetable] --> F[Forward timetable dataset]
+    G[GB Stations and CORPUS] --> H[Station reference table]
 
-### 1. Data Ingestion
-Three Kafka/REST ingestion notebooks stream road closure, Darwin real-time, and train moment data into Azure Blob Storage as timestamped CSV files. A local caching layer in `azure_client.py` avoids re-downloading blobs already present on disk, with time-window filtering via filename-encoded timestamps.
+    D --> I[Haversine spatial join]
+    H --> I
+    E --> J[Training station-day dataset]
+    I --> J
 
-### 2. Identifier Crosswalk
-Train moments carry STANOX codes; the Darwin timetable uses TIPLOC codes; the station reference is indexed by TLC (3-letter code). The CORPUS extract (`CORPUSExtract.json`, 55,920 records) provides the STANOX → TIPLOC → 3ALPHA mapping that links all three sources. Match rate: 99.96% of stations (2,594 / 2,595).
+    J --> K[Classification model]
+    J --> L[Regression model]
+    F --> M[Forward prediction dataset]
+    K --> M
+    L --> M
 
-### 3. Geospatial Matching
-Each road closure centroid is matched to rail stations within a **10–25 km haversine band** using `geo.find_nearby_stations()`. The lower bound excludes stations with direct physical proximity to the closure; the upper bound reflects the hypothesised attenuation of cross-modal modal shift effects. Applied to 296 closures, this produces 16,361 closure–station pairs across the observation window.
-
-### 4. Temporal Filtering
-Only rail service events whose planned timestamp falls **within 60 minutes of a closure start** are retained, implemented in `features.filter_within_time_window()`. Records are uniformly distributed across 10-minute sub-buckets within the window, confirming no systematic temporal bias.
-
-### 5. Analytical Datasets
-
-Two datasets are produced after spatial join and temporal filtering:
-
-| Dataset | Source | Rows | Closures | Stations | Purpose |
-|---------|--------|------|----------|----------|---------|
-| Retrospective | Train moments | 5,446 | 126 | 854 | Model training (delay label known) |
-| Forward-looking | Darwin timetable | 100,069 | 190 | 1,467 | Prediction (planned timestamps only) |
-
-The timetable dataset is ~18.4× larger than the retrospective dataset. 621 stations and 64 closures appear only in the prediction set, representing a deliberate generalisation challenge for the model.
-
-### 6. Feature Engineering
-
-Features used in the model, implemented in `features.py`:
-
-| Feature | Type | Description |
-|---------|------|-------------|
-| `distance_in_km` | Continuous | Haversine distance from closure centroid to station (10–25 km) |
-| `planned_time_diff` | Continuous | Minutes from closure start to planned service (0–60 min) |
-| `distance_time_interaction` | Continuous | distance × planned_time_diff |
-| `start_hour` | Categorical | Hour of day of closure start |
-| `start_dow` | Categorical | Day of week of closure start |
-| `closure_type` | Categorical | planned / unplanned |
-| `cause_type` | Categorical | roadMaintenance, accident, etc. |
-| `validity_status` | Categorical | active / suspended / planned |
-| `lanes_closed` | Numeric | Proxy for disruption severity (0–4) |
-| `event_type` | Categorical | ARRIVAL / DEPARTURE / PASS |
-
-
-
-### 7. Modelling
-
-Four candidate models evaluated on the retrospective dataset with a temporal train/test split:
-
-- Linear Regression (interpretable baseline)
-- Random Forest
-- Gradient Boosting
-- XGBoost
-
-Primary evaluation metrics: ROC-AUC and F1 score (appropriate given class imbalance). The best-performing model is applied to the 100,069-row forward-looking timetable dataset to produce per-service delay probability scores, ranked by predicted risk.
-
----
-
-## Key EDA Findings
-
-| Finding | Value |
-|---------|-------|
-| Observation window | 10–13 April 2026 (72 hours) |
-| Road closures | 352 total - 214 planned, 138 unplanned |
-| Train moments (clean) | 39,091 rows - 38.1% delayed (variation_status) |
-| Raw delay distribution | Median 1 min, mean 2.53 min, max 293 min (skewness 12.31) |
-| Timetable stop rows | ~1.9M across ~121K journeys |
-| Retrospective dataset | 93,749 rows, 184 closures, 1373 stations |
-| Prediction dataset | 269,497 rows, 243 closures, 1,566 stations |
-| Pearson r (distance vs delay) | –0.010 |
-| Pearson r (time diff vs delay) | -0.002 |
-
-The weak linear correlation between spatial/temporal proximity and delay motivates a non-linear classification approach rather than regression.
-
----
-
-## Requirements
-
-```
-azure-storage-blob>=12.0
-confluent-kafka
-pandas>=2.0
-numpy>=1.24
-geopandas
-scikit-learn>=1.3
-xgboost>=2.0
-matplotlib>=3.7
-seaborn>=0.12
-python-dotenv>=1.0
-pyarrow>=15.0.0
-lxml
+    M --> N[Gradio dashboard]
 ```
 
----
+## Modelling Design
 
-## Notes
+The main training dataset is structured at station-day level. Each row represents one station on one calendar day. The binary target is set to one when mean arrival delay is greater than five minutes.
 
-- The `data/` directory is excluded from version control (`.gitignore`). All intermediate parquet files are regenerated by running EDA notebooks in order.
-- Credentials are never stored in source copy `.env.example` to `.env` and populate before running.
-- The pipeline is designed for extensibility: Street Manager emergency works and BODS bus feeds are the next planned data source integrations.
+Feature groups include:
+
+| Feature Group | Examples |
+|---|---|
+| Closure attributes | Closure count, unplanned closure count, minimum distance and duration |
+| Spatial severity | Inverse-distance weighted closure score and road class severity |
+| Temporal memory | One-day, three-day and seven-day closure lag features |
+| Calendar effects | Day of week, Monday flag, Friday flag and weekend flag |
+| Rail volume | Number of train movement records at station-day level |
+
+The main classifier is XGBoost. Logistic Regression, Random Forest, Gradient Boosting and LightGBM are used as comparators. Precision-Recall AUC is used as the primary classification metric because disrupted station-days are rare. A regression model estimates the expected mean delay in minutes.
+
+## Current Results
+
+The final integrated dataset contains 33,941 station-days across the April 2026 analysis window. The five-minute disruption threshold produces 1,916 disrupted station-days and 32,025 non-disrupted station-days, giving a disruption rate of 5.65%.
+
+The best classification model is XGBoost with a PR-AUC of 0.120 against a random baseline of 0.065. The optimal threshold is 0.53. At that threshold, the model identifies approximately 49% of genuinely disrupted station-days but with low precision. This means the model detects a weak signal but is not yet reliable enough for operational deployment.
+
+The regression model performs close to the mean baseline. The tuned XGBoost regressor achieves an MAE of 1.552 minutes and an R2 of 0.010. This indicates that the available features explain only a small proportion of the variation in station-day delay.
+
+These results are useful because they show the limits of open data at the current resolution. The pipeline works, but the signal requires a longer collection window, finer temporal aggregation and passenger volume data to become operationally stronger.
+
+## Dashboard
+
+The Gradio dashboard provides two main views.
+
+1. Road Closures and Stations  
+   This view shows active road closures, nearby stations within the selected radius and station-level predicted disruption risk.
+
+2. Data Overview  
+   This view summarises dataset coverage, model performance, risk bands and feature importance.
+
+The app is launched from:
+
+```bash
+gradio app.py
+```
+
+The dashboard uses Folium maps for spatial exploration and Matplotlib charts for station history, prediction trends and model feature importance.
+
+## Setup
+
+Create a virtual environment and install dependencies.
+
+On Windows:
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Create a `.env` file using the required credentials.
+
+```text
+AZURE_STORAGE_CONNECTION_STRING=
+ROAD_CLOSURES_API_KEY=
+ROAD_CLOSURES_URL=
+KAFKA_BOOTSTRAP_SERVERS=
+KAFKA_SECURITY_PROTOCOL=
+KAFKA_SASL_MECHANISM=
+KAFKA_SASL_USERNAME=
+KAFKA_SASL_PASSWORD=
+KAFKA_AUTO_OFFSET_RESET=
+REAL_TIME_FEEDS_TOPIC=
+REAL_TIME_FEEDS_GROUP_ID=
+TRAIN_MOMENTS_TOPIC=
+TRAIN_MOMENTS_GROUP_ID=
+GEMINI_API_KEY=
+```
+
+`GEMINI_API_KEY` is optional. If it is not set, the operational briefing panel will show that the briefing is unavailable.
+
+## Running the Project
+
+1. Run the ingestion notebooks to collect raw road, rail and timetable data.
+2. Run the EDA notebooks in order from `eda_01` to `eda_06`.
+3. Run the modelling notebook to train and export model artefacts.
+4. Launch the dashboard.
+
+```bash
+gradio app.py
+```
+
+The dashboard expects processed datasets in:
+
+```text
+notebooks/data/processed/
+```
+
+and model artefacts in:
+
+```text
+notebooks/models/
+```
+
+## Important Limitations
+
+The project should be interpreted as a proof of concept rather than a deployed predictive system.
+
+The main limitations are:
+
+- The April 2026 collection window is short and covers only one operational season.
+- CORPUS mapping does not resolve every rail location.
+- Road closures are represented by centroid points, which can introduce spatial error for long closures.
+- Passenger volume data is not available at station-day level.
+- Station-day aggregation may hide short peak-hour disruption effects.
+
+## Future Work
+
+The most valuable next steps are:
+
+1. Extend ingestion to a full year of road and rail data.
+2. Move from station-day to station-hour modelling.
+3. Add passenger demand or urban traffic data.
+4. Replace closure metadata severity with observed traffic flow impact.
+5. Add SHAP explanations for individual high-risk predictions.
+
+## Project Status
+
+This repository contains the current proof-of-concept implementation for the MSc dissertation project:
+
+**Road-Rail Resilience: A Machine Learning Model for Cross-Modal Disruption**
+
+The project demonstrates that open road and rail data can be joined into a reusable analytical pipeline. The current model finds a weak but measurable signal. Further data depth and improved operational features are required before the method can support reliable live decision-making.

@@ -28,14 +28,14 @@ REAL_TIME_FEEDS_CONFIG = {
 }
 
 # Train Moments Kafka configuration
-TRAIN_MOMENTS_TOPIC = os.environ["TRAIN_MOMENTS_TOPIC"]
-TRAIN_MOMENTS_CONFIG = {
+TRAIN_MOVEMENTS_TOPIC = os.environ["TRAIN_MOVEMENTS_TOPIC"]
+TRAIN_MOVEMENTS_CONFIG = {
     'bootstrap.servers': os.environ["KAFKA_BOOTSTRAP_SERVERS"],
     'security.protocol': os.environ["KAFKA_SECURITY_PROTOCOL"],
     'sasl.mechanism': os.environ["KAFKA_SASL_MECHANISM"],
     'sasl.username': os.environ["KAFKA_SASL_USERNAME"],
     'sasl.password': os.environ["KAFKA_SASL_PASSWORD"],
-    'group.id': os.environ["TRAIN_MOMENTS_GROUP_ID"],
+    'group.id': os.environ["TRAIN_MOVEMENTS_GROUP_ID"],
     'auto.offset.reset': os.environ["KAFKA_AUTO_OFFSET_RESET"]
 }
 
@@ -43,7 +43,7 @@ AZURE_CONNECTION_STRING = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
 
 # Azure container names
 CONTAINER_ROAD_CLOSURES = "road-closures"
-CONTAINER_TRAIN_MOMENTS = "train-moments"
+CONTAINER_TRAIN_MOVEMENTS = "train-moments"
 CONTAINER_DARWIN_REALTIME = "darwin-realtime-feeds"
 CONTAINER_DARWIN_TIMETABLE = "darwin-timetable-feeds"
 CONTAINER_RAIL_ROAD_DATA = "rail-road-data"

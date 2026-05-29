@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from src.azure_client import get_service_client, download_blobs_in_window, list_blobs
 from src.config import (
     CONTAINER_ROAD_CLOSURES,
-    CONTAINER_TRAIN_MOMENTS,
+    CONTAINER_TRAIN_MOVEMENTS,
     CONTAINER_DARWIN_REALTIME,
     CONTAINER_DARWIN_TIMETABLE,
     CONTAINER_RAIL_ROAD_DATA,
@@ -19,7 +19,7 @@ from src.config import (
 
 CONTAINERS = [
     CONTAINER_ROAD_CLOSURES,
-    CONTAINER_TRAIN_MOMENTS,
+    CONTAINER_TRAIN_MOVEMENTS,
     CONTAINER_DARWIN_REALTIME,
     CONTAINER_DARWIN_TIMETABLE,
     CONTAINER_RAIL_ROAD_DATA,
